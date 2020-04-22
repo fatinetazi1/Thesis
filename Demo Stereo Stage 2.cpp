@@ -4,8 +4,7 @@
 
 using namespace DirectGraphicalModels;
 
-void print_help(char *argv0)
-{
+void print_help(char *argv0) {
     printf("Usage: %s left_image right_image min_disparity max_disparity node_norm_function edge_training_model left_image_groundtruth right_image_features output_disparity\n", argv0);
     
     printf("\nNode norm function:\n");
@@ -21,24 +20,15 @@ void print_help(char *argv0)
     printf("3: Concatenated Model\n");
 }
 
-float manhattan_norm(float i) {
-    return abs(i);
-}
+float manhattan_norm(float i) { return abs(i); }
 
-float euclidean_norm(float i) {
-    return sqrt(pow(abs(i), 2));
-}
+float euclidean_norm(float i) { return sqrt(pow(abs(i), 2)); }
 
-float p_norm(float i, int p) {
-    return pow(pow(abs(i), p), 1/p);
-}
+float p_norm(float i, int p) { return pow(pow(abs(i), p), 1/p); }
 
-float zero_norm(float i) {
-    return (pow(2, -1)*i) / (1+i);
-}
+float zero_norm(float i) { return (pow(2, -1)*i) / (1+i); }
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
     if (argc != 10) {
         print_help(argv[0]);
         return 0;
@@ -146,8 +136,7 @@ int main(int argc, char *argv[])
     
     // ==================== STAGE 3: Filling the Graph =====================
     Timer::start("Filling the Graph... ");
-//    graphExt.setGraph(nodePot);                         // Filling-in the graph nodes
-    
+    // Filling in the node potentials
     byte nStatesBase = static_cast<byte>(nodePot.channels());
     Mat nPotBase(nStates, 1, CV_32FC1, Scalar(0.0f));
     for (int y = 0; y < height; y++) {
@@ -159,11 +148,8 @@ int main(int argc, char *argv[])
             graph.setNode(idx, nPotBase);
          } // x
      } // y
-    
     graphExt.fillEdges(*edgeTrainer, test_fv, vParams);    // Filling-in the graph edges with pairwise potentials
     Timer::stop();
-    
-    
     
     // =============================== Decoding ===============================
     Timer::start("Decoding... ");
@@ -185,9 +171,7 @@ int main(int argc, char *argv[])
     }
     
     imwrite(argv[9], disparity);
-
     imshow("Disparity", disparity);
-
     waitKey();
 
     return 0;
