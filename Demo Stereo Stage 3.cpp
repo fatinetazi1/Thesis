@@ -28,6 +28,19 @@ float p_norm(float i, int p) { return pow(pow(abs(i), p), 1/p); }
 
 float zero_norm(float i) { return (pow(2, -1)*i) / (1+i); }
 
+float meanSqrDist(Mat im1, Mat im2, float scaleFactor = 1) {
+    float sum = 0;
+    for (int y = 0; y < im1.rows; y++) {
+        const byte *pM1 = im1.ptr<byte>(y);
+        const byte *pM2 = im2.ptr<byte>(y);
+        for (int x = 0; x < im1.cols; x++){
+            float difference = pM1[x] - (pM2[x]/scaleFactor);
+            sum += pow(abs(difference), 2);
+        }
+    }
+    return sum / (im1.rows*im1.cols);
+}
+
 int main(int argc, char *argv[]) {
     if (argc != 11) {
         print_help(argv[0]);
@@ -66,7 +79,6 @@ int main(int argc, char *argv[]) {
     CGraphPairwise      graph(nStates);
     CGraphPairwiseExt   graphExt(graph);
     CInferLBP           decoder(graph);
-    CCMat               confMat(nStates);
     
     // Initializing Powell search class and parameters
     const vec_float_t vInitParams  = { 100.0f, 300.0f, 3.0f, 10.0f };
@@ -177,16 +189,17 @@ int main(int argc, char *argv[]) {
         
         // ====================== Evaluation =======================
         Mat solution(imgL.size(), CV_8UC1, optimalDecoding.data());
-        confMat.estimate(test_gt, solution);                              // compare solution with the groundtruth
+        float val = meanSqrDist(solution, test_gt, 8);              // compare solution with the groundtruth
         
         printf("Iteration: %d, parameters: { ", i);
         for (const float& param : vEstParams) printf("%.1f ", param);
-        printf("}, accuracy: %.2f%%\n", confMat.getAccuracy());
+        printf("}, accuracy: %.2f%%\n", val);
 
         if (powell.isConverged()) break;
-        vEstParams = powell.getParams(confMat.getAccuracy());
-        graph.reset();
-        confMat.reset();
+        vEstParams = powell.getParams(val);
+//        m_vNodes.clear();
+//        m_vEdges.clear();
+//        graph.reset();
     }
     
     // ============================ Visualization =============================
