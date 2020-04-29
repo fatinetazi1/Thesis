@@ -1,19 +1,19 @@
-// Example Disparity estimation with CRFs
 #include "DGM.h"
 #include "DGM/timer.h"
 
 using namespace DirectGraphicalModels;
 
-void print_help(char *argv0)
-{
+void print_help(char *argv0) {
     printf("Usage: %s left_image right_image min_disparity max_disparity output_disparity\n", argv0);
 }
 
 int main(int argc, char *argv[]) {
+    
     if (argc != 6) {
         print_help(argv[0]);
         return 0;
     }
+    
     // Reading parameters and images
     Mat       imgL          = imread(argv[1], 0);   if (imgL.empty()) printf("Can't open %s\n", argv[1]);
     Mat       imgR          = imread(argv[2], 0);   if (imgR.empty()) printf("Can't open %s\n", argv[2]);
