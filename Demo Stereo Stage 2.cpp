@@ -60,7 +60,6 @@ int main(int argc, char *argv[]) {
     CGraphPairwise      graph(nStates);
     CGraphPairwiseExt   graphExt(graph);
     CInferLBP           decoder(graph);
-    CCMat               confMat(nStates);
     
     // ==================== Building the graph ====================
     Timer::start("Building the Graph... ");

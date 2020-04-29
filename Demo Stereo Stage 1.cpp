@@ -13,13 +13,13 @@ void print_help(char *argv0) {
     printf("3: P-norm\n");
 }
 
+float zero_norm(float i) { return (pow(2, -1)*i) / (1+i); }
+
 float manhattan_norm(float i) { return abs(i); }
 
 float euclidean_norm(float i) { return sqrt(pow(abs(i), 2)); }
 
 float p_norm(float i, int p) { return pow(pow(abs(i), p), 1/p); }
-
-float zero_norm(float i) { return (pow(2, -1)*i) / (1+i); }
 
 int main(int argc, char *argv[]) {
     
@@ -48,7 +48,7 @@ int main(int argc, char *argv[]) {
     Mat nodePot(nStates, 1, CV_32FC1);                                      // node potential (column-vector)
     float p;                                                                // potential
     int p_value = 0;                                                        // user input
-    if (nodeNorm == 2) {
+    if (nodeNorm == 3) {
         printf( "Enter a p-value : ");
         scanf("%d", &p_value);
     }
