@@ -98,7 +98,7 @@ int main(int argc, char *argv[]) {
     sprintf(dispStr, "Min-disparity: %d / Max-disparity: %d", minDisparity, maxDisparity);
     putText(disparity, dispStr, Point(width - 290, height - 5), cv::HersheyFonts::FONT_HERSHEY_SIMPLEX, 0.45, Scalar(0, 0, 0), 1, cv::LineTypes::LINE_AA);
     
-    if (nodeNorm == 2) {
+    if (nodeNorm == 3) {
         char pStr[255];
         sprintf(pStr, "P-value: %d", p_value);
         putText(disparity, pStr, Point(width - 380, height - 5), cv::HersheyFonts::FONT_HERSHEY_SIMPLEX, 0.45, Scalar(0, 0, 0), 1, cv::LineTypes::LINE_AA);

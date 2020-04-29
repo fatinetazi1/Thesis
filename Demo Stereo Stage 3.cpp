@@ -1,11 +1,10 @@
-// Example Disparity estimation with CRFs
 #include "DGM.h"
 #include "DGM/timer.h"
 
 using namespace DirectGraphicalModels;
 
 void print_help(char *argv0) {
-    printf("Usage: %s left_image right_image min_disparity max_disparity node_norm_function edge_training_model left_image_groundtruth right_image_features output_disparity\n", argv0);
+    printf("Usage: %s left_image right_image min_disparity max_disparity node_norm_function edge_training_model left_image_groundtruth left_image_groundtruth right_image_features output_disparity\n", argv0);
     
     printf("\nNode norm function:\n");
     printf("0: Manhattan norm\n");
@@ -20,13 +19,13 @@ void print_help(char *argv0) {
     printf("3: Concatenated Model\n");
 }
 
+float zero_norm(float i) { return (pow(2, -1)*i) / (1+i); }
+
 float manhattan_norm(float i) { return abs(i); }
 
 float euclidean_norm(float i) { return sqrt(pow(abs(i), 2)); }
 
 float p_norm(float i, int p) { return pow(pow(abs(i), p), 1/p); }
-
-float zero_norm(float i) { return (pow(2, -1)*i) / (1+i); }
 
 float meanSqrDist(Mat im1, Mat im2, float scaleFactor = 1) {
     float sum = 0;
@@ -53,16 +52,17 @@ int main(int argc, char *argv[]) {
     int minDisparity    = atoi(argv[3]);
     int maxDisparity    = atoi(argv[4]);
     int nodeNorm        = atoi(argv[5]);
-    int edgeModel       = atoi(argv[6]);
+    int edgeModel       = atoi(argv[6]);        if (edgeModel > 2 || edgeModel < 0) { print_help(argv[0]); return 0; }
+    int scaleFactor     = 255/maxDisparity;
     
-    Mat train_gt = imread(argv[7], -1); if (train_gt.empty()) printf("Can't open %s\n", argv[7]);
-    resize(train_gt, train_gt, imgL.size(), 0, 0, INTER_NEAREST);        // groundtruth for training (imgL)
+    Mat train_gt        = imread(argv[7], -1);   if (train_gt.empty()) printf("Can't open %s\n", argv[7]);
+    resize(train_gt, train_gt, Size(imgL.cols, imgL.rows), 0, 0, INTER_NEAREST);    // groundtruth for training (imgL)
     
-    Mat test_fv = imread(argv[8], 1);   if (test_fv.empty()) printf("Can't open %s\n", argv[8]);
-    resize(test_fv,  test_fv,  imgL.size(), 0, 0, INTER_LANCZOS4);    // testing image feature vector (imgR)
+    Mat test_gt         = imread(argv[8], -1);   if (test_gt.empty()) printf("Can't open %s\n", argv[8]);
+    resize(test_gt,  test_gt,  Size(imgL.cols, imgL.rows), 0, 0, INTER_NEAREST);   // right image feature vector (imgR)
     
-    Mat test_gt = imread(argv[9], -1);   if (test_gt.empty()) printf("Can't open %s\n", argv[9]);
-    resize(test_gt,  test_gt,  imgL.size(), 0, 0, INTER_NEAREST);    // groundtruth for evaluation (imgR)
+    Mat test_fv         = imread(argv[9], 1);   if (test_fv.empty()) printf("Can't open %s\n", argv[9]);
+    resize(test_fv,  test_fv,  Size(imgL.cols, imgL.rows), 0, 0, INTER_LANCZOS4);   // right image feature vector (imgR)
     
     const int           width       = imgL.cols;
     const int           height      = imgL.rows;
@@ -76,9 +76,16 @@ int main(int argc, char *argv[]) {
     if (edgeModel == 0 || edgeModel == 3) vParams.pop_back(); // Potts and Concat models need ony 1 parameter
     
     auto                edgeTrainer = CTrainEdge::create(edgeModel, nStates, nFeatures);
+    
+    //  PairwiseGraph
     CGraphPairwise      graph(nStates);
     CGraphPairwiseExt   graphExt(graph);
     CInferLBP           decoder(graph);
+    
+    //    DenseGraph: Uncomment block below for dense graph. Comment block above.
+    //    CGraphDense      graph(nStates);
+    //    CGraphDenseExt   graphExt(graph);
+    //    CInferDense      decoder(graph);
     
     // Initializing Powell search class and parameters
     const vec_float_t vInitParams  = { 100.0f, 300.0f, 3.0f, 10.0f };
@@ -100,7 +107,7 @@ int main(int argc, char *argv[]) {
     // Node Potentials
     float p;
     int p_value = 0;
-    if (nodeNorm == 2) {
+    if (nodeNorm == 3) {
         printf( "Enter a p-value : ");
         scanf("%d", &p_value);
     }
@@ -143,16 +150,16 @@ int main(int argc, char *argv[]) {
     Mat featureVector1(nFeatures, 1, CV_8UC1);
     Mat featureVector2(nFeatures, 1, CV_8UC1);
     for (int y = 1; y < height; y++) {
-        byte *pimgL1 = imgL.ptr<byte>(y);
-        byte *pimgL2 = imgL.ptr<byte>(y - 1);
-        byte *pimgLGT1 = train_gt.ptr<byte>(y);
-        byte *pimgLGT2 = train_gt.ptr<byte>(y - 1);
+        byte *pimgL1 = test_fv.ptr<byte>(y);
+        byte *pimgL2 = test_fv.ptr<byte>(y - 1);
+        byte *pimgLGT1 = test_gt.ptr<byte>(y);
+        byte *pimgLGT2 = test_gt.ptr<byte>(y - 1);
         for (int x = 1; x < width; x++) {
-            for (word f = 0; f < nFeatures; f++) featureVector1.at<byte>(f, 0) = pimgL1[nFeatures * x + f];       // featureVector1 = fv[x][y]
-            for (word f = 0; f < nFeatures; f++) featureVector2.at<byte>(f, 0) = pimgL1[nFeatures * (x - 1) + f]; // featureVector2 = fv[x-1][y]
+            for (word f = 0; f < nFeatures; f++) featureVector1.at<byte>(f, 0) = pimgL1[nFeatures * x + f]/scaleFactor;       // featureVector1 = fv[x][y]
+            for (word f = 0; f < nFeatures; f++) featureVector2.at<byte>(f, 0) = pimgL1[nFeatures * (x - 1) + f]/scaleFactor; // featureVector2 = fv[x-1][y]
             edgeTrainer->addFeatureVecs(featureVector1, pimgLGT1[x], featureVector2, pimgLGT1[x-1]);
             edgeTrainer->addFeatureVecs(featureVector2, pimgLGT1[x-1], featureVector1, pimgLGT1[x]);
-            for (word f = 0; f < nFeatures; f++) featureVector2.at<byte>(f, 0) = pimgL2[nFeatures * x + f];       // featureVector2 = fv[x][y-1]
+            for (word f = 0; f < nFeatures; f++) featureVector2.at<byte>(f, 0) = pimgL2[nFeatures * x + f]/scaleFactor;       // featureVector2 = fv[x][y-1]
             edgeTrainer->addFeatureVecs(featureVector1, pimgLGT1[x], featureVector2, pimgLGT2[x]);
             edgeTrainer->addFeatureVecs(featureVector2, pimgLGT2[x], featureVector1, pimgLGT1[x]);
         } // x
@@ -180,11 +187,12 @@ int main(int argc, char *argv[]) {
              } // x
          } // y
         graphExt.fillEdges(*edgeTrainer, test_fv, vParams);    // Filling-in the graph edges with pairwise potentials
+        // graphExt.addDefaultEdgesModel(test_fv, 1.175f);  // Uncomment for dense graph. Comment line above.
         Timer::stop();
         
         // =============================== Decoding ===============================
         Timer::start("Decoding... ");
-        optimalDecoding = decoder.decode(10);
+        optimalDecoding = decoder.decode(100);
         Timer::stop();
         
         // ====================== Evaluation =======================
@@ -210,7 +218,7 @@ int main(int argc, char *argv[]) {
     char dispStr[255];
     sprintf(dispStr, "Min-disparity: %d / Max-disparity: %d", minDisparity, maxDisparity);
     putText(disparity, dispStr, Point(width - 290, height - 5), cv::HersheyFonts::FONT_HERSHEY_SIMPLEX, 0.45, Scalar(0, 0, 0), 1, cv::LineTypes::LINE_AA);
-    if (nodeNorm == 2) {
+    if (nodeNorm == 3) {
         char pStr[255];
         sprintf(pStr, "P-value: %d", p_value);
         putText(disparity, pStr, Point(width - 380, height - 5), cv::HersheyFonts::FONT_HERSHEY_SIMPLEX, 0.45, Scalar(0, 0, 0), 1, cv::LineTypes::LINE_AA);
@@ -222,3 +230,4 @@ int main(int argc, char *argv[]) {
 
     return 0;
 }
+
