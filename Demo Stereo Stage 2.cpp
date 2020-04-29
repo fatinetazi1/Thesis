@@ -1,4 +1,3 @@
-// Example Disparity estimation with CRFs
 #include "DGM.h"
 #include "DGM/timer.h"
 
@@ -8,10 +7,10 @@ void print_help(char *argv0) {
     printf("Usage: %s left_image right_image min_disparity max_disparity node_norm_function edge_training_model left_image_groundtruth right_image_features output_disparity\n", argv0);
     
     printf("\nNode norm function:\n");
-    printf("0: Manhattan norm\n");
-    printf("1: Euclidean norm\n");
-    printf("2: P-norm\n");
-    printf("3: Zero norm\n");
+    printf("0: Zero norm\n");
+    printf("1: Manhattan norm\n");
+    printf("2: Euclidean norm\n");
+    printf("3: P-norm\n");
     
     printf("\nEdge training models:\n");
     printf("0: Potts Model\n");
@@ -43,9 +42,10 @@ int main(int argc, char *argv[]) {
     int edgeModel       = atoi(argv[6]);
     
     Mat train_gt        = imread(argv[7], -1);   if (train_gt.empty()) printf("Can't open %s\n", argv[7]);
-    resize(train_gt, train_gt, Size(imgL.cols, imgL.rows), 0, 0, INTER_NEAREST);        // groundtruth for training
+    resize(train_gt, train_gt, Size(imgL.cols, imgL.rows), 0, 0, INTER_NEAREST);    // groundtruth for training (imgL)
+    
     Mat test_fv         = imread(argv[8], 1);   if (test_fv.empty()) printf("Can't open %s\n", argv[8]);
-    resize(test_fv,  test_fv,  Size(imgL.cols, imgL.rows), 0, 0, INTER_LANCZOS4);    // testing image feature vector (imgR)
+    resize(test_fv,  test_fv,  Size(imgL.cols, imgL.rows), 0, 0, INTER_LANCZOS4);   // testing image feature vector (imgR)
         
     const int           width       = imgL.cols;
     const int           height      = imgL.rows;
@@ -54,7 +54,7 @@ int main(int argc, char *argv[]) {
     
     // Preparing parameters for edge trainers
     vec_float_t            vParams = {100, 0.01f};
-    if (edgeModel == 0 || edgeModel == 3) vParams.pop_back(); // Potts and Concat models need ony 1 parameter
+    if (edgeModel == 0 || edgeModel == 3) vParams.pop_back(); // Potts and Concat models only need 1 parameter
     
     auto                edgeTrainer = CTrainEdge::create(edgeModel, nStates, nFeatures);
     CGraphPairwise      graph(nStates);
@@ -71,14 +71,14 @@ int main(int argc, char *argv[]) {
     Timer::start("Setting the Node Potentials & Edge Training... ");
     
     // Node Potentials
-    float p;
-    int p_value = 0;
+    float p;                                // potential
+    int p_value = 0;                        // user input
     if (nodeNorm == 2) {
         printf( "Enter a p-value : ");
         scanf("%d", &p_value);
     }
     
-    Mat nodePot(imgL.size(), CV_32FC(nStates));
+    Mat nodePot(imgL.size(), CV_32FC(nStates));                             // node potentials
     Mat pot(nStates, 1, CV_32FC1);
     for (int y = 0; y < height; y++) {
         byte * pImgL        = imgL.ptr<byte>(y);
@@ -91,16 +91,16 @@ int main(int argc, char *argv[]) {
                 float imgR_value = (x + disparity < width) ? static_cast<float>(pImgR[x + disparity]) : imgL_value;
                 switch (nodeNorm) {
                     case 0:
-                        p = 1.0f - manhattan_norm(imgL_value - imgR_value) / 255.0f;
+                        p = 1.0f - zero_norm(imgL_value - imgR_value) / 255.0f;
                         break;
                     case 1:
-                        p = 1.0f - euclidean_norm(imgL_value - imgR_value) / 255.0f;
+                        p = 1.0f - manhattan_norm(imgL_value - imgR_value) / 255.0f;
                         break;
                     case 2:
-                        p = 1.0f - p_norm(imgL_value - imgR_value, p_value) / 255.0f;
+                        p = 1.0f - euclidean_norm(imgL_value - imgR_value) / 255.0f;
                         break;
                     case 3:
-                        p = 1.0f - zero_norm(imgL_value - imgR_value) / 255.0f;
+                        p = 1.0f - p_norm(imgL_value - imgR_value, p_value) / 255.0f;
                         break;
                     default:
                         p = 1.0f - manhattan_norm(imgL_value - imgR_value) / 255.0f;
@@ -164,6 +164,7 @@ int main(int argc, char *argv[]) {
     char dispStr[255];
     sprintf(dispStr, "Min-disparity: %d / Max-disparity: %d", minDisparity, maxDisparity);
     putText(disparity, dispStr, Point(width - 290, height - 5), cv::HersheyFonts::FONT_HERSHEY_SIMPLEX, 0.45, Scalar(0, 0, 0), 1, cv::LineTypes::LINE_AA);
+    
     if (nodeNorm == 2) {
         char pStr[255];
         sprintf(pStr, "P-value: %d", p_value);
