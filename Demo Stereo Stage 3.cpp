@@ -16,7 +16,6 @@ void print_help(char *argv0) {
     printf("0: Potts Model\n");
     printf("1: Contrast-Sensitive Potts Model\n");
     printf("2: Contrast-Sensitive Potts Model with Prior\n");
-    printf("3: Concatenated Model\n");
 }
 
 float zero_norm(float i) { return (pow(2, -1)*i) / (1+i); }
