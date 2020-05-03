@@ -63,17 +63,10 @@ int main(int argc, char *argv[]) {
     int nodeNorm        = atoi(argv[5]);
     int edgeModel       = atoi(argv[6]);    if (edgeModel > 2 || edgeModel < 0) { print_help(argv[0]); return 0; }
     
-    PFM imgL_pfm;
-    float* pimgL_pfm = imgL_pfm.read_pfm<float>("/Users/fatine/Documents/Thesis/Data/Bicycle1-perfect/disp1.pfm");
-    Mat imgL_gt = Mat(imgL.rows*gtScaleFactor, imgL.cols*gtScaleFactor, CV_32FC1, pimgL_pfm);
-    resize(imgL_gt, imgL_gt, Size(imgL_gt.cols / gtScaleFactor, imgL_gt.rows / gtScaleFactor));
-    imwrite("/Users/fatine/Documents/Thesis/Data/Bicycle1-perfect/gt1.png", imgL_gt);
-    
     PFM imgR_pfm;
     float* pimgR_pfm = imgR_pfm.read_pfm<float>(argv[7]);
     Mat imgR_gt = Mat(rows, cols, CV_32FC1, pimgR_pfm);
     resize(imgR_gt, imgR_gt, Size(imgR_gt.cols / gtScaleFactor, imgR_gt.rows / gtScaleFactor));
-    imwrite("/Users/fatine/Documents/Thesis/Data/Bicycle1-perfect/gt0.png", imgR_gt);
     
     Mat imgR_fv = imread(argv[8], 1);       if (imgR_fv.empty()) printf("Can't open %s\n", argv[8]);
     resize(imgR_fv, imgR_fv, Size(imgR_fv.cols / gtScaleFactor, imgR_fv.rows / gtScaleFactor));
@@ -200,12 +193,12 @@ int main(int argc, char *argv[]) {
                  } // x
              } // y
             graphExt.fillEdges(*edgeTrainer, imgR_fv, vParams);    // Filling-in the graph edges with pairwise potentials
-        //    graphExt.addDefaultEdgesModel(imgR_fv, 1.175f);  // Uncomment for dense graph. Comment line above.
+//            graphExt.addDefaultEdgesModel(imgR_fv, 1.175f);  // Uncomment for dense graph. Comment line above.
             Timer::stop();
         
         // =============================== Decoding ===============================
         Timer::start("Decoding... ");
-        optimalDecoding = decoder.decode(100);
+        optimalDecoding = decoder.decode(10);
         Timer::stop();
                 
         // ====================== Evaluation =======================
