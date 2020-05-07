@@ -27,10 +27,15 @@ int main(int argc, char *argv[]) {
         print_help(argv[0]);
         return 0;
     }
+    
+    int gtScaleFactor = 6;
 
     // Reading parameters and images
-    Mat             imgL            = imread(argv[1], 0);    if (imgL.empty()) printf("Can't open %s\n", argv[1]);
-    Mat             imgR            = imread(argv[2], 0);    if (imgR.empty()) printf("Can't open %s\n", argv[2]);
+    Mat imgL = imread(argv[1], 0);          if (imgL.empty()) printf("Can't open %s\n", argv[1]);
+    resize(imgL, imgL, Size(imgL.cols / gtScaleFactor, imgL.rows / gtScaleFactor));
+    
+    Mat imgR = imread(argv[2], 0);          if (imgR.empty()) printf("Can't open %s\n", argv[2]);
+    resize(imgR, imgR, Size(imgR.cols / gtScaleFactor, imgR.rows / gtScaleFactor));
     int             minDisparity    = atoi(argv[3]);
     int             maxDisparity    = atoi(argv[4]);
     int             nodeNorm        = atoi(argv[5]);
