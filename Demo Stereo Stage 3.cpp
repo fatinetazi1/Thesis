@@ -208,7 +208,7 @@ int main(int argc, char *argv[]) {
         
         printf("Iteration: %d, parameters: { ", i);
         for (const float& param : vEstParams) printf("%.1f ", param);
-        printf("}, accuracy: %.2f%%\n", val);
+        printf("}, Mean squared error: %.2f%%\n", val);
 
         if (powell.isConverged()) break;
         vEstParams = powell.getParams(val);

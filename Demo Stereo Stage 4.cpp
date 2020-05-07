@@ -110,7 +110,6 @@ int main(int argc, char *argv[]) {
     float* pimgR_pfm = imgR_pfm.read_pfm<float>(argv[7]);
     Mat imgR_gt = Mat(rows, cols, CV_32FC1, pimgR_pfm);
     resize(imgR_gt, imgR_gt, Size(imgR_gt.cols / gtScaleFactor, imgR_gt.rows / gtScaleFactor));
-    imwrite("/Users/fatine/Documents/Thesis/Data/Bicycle1-perfect/gt0.png", imgR_gt);
     
     Mat imgR_fv = imread(argv[8], 1);       if (imgR_fv.empty()) printf("Can't open %s\n", argv[8]);
     resize(imgR_fv, imgR_fv, Size(imgR_fv.cols / gtScaleFactor, imgR_fv.rows / gtScaleFactor));
@@ -252,7 +251,7 @@ int main(int argc, char *argv[]) {
         
         printf("Iteration: %d, parameters: { ", i);
         for (const float& param : vEstParams) printf("%.1f ", param);
-        printf("}, accuracy: %.2f%%\n", val);
+        printf("}, Mean squared error: %.2f%%\n", val);
 
         if (powell.isConverged()) break;
         vEstParams = powell.getParams(val);
