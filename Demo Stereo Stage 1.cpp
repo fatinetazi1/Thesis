@@ -131,19 +131,19 @@ int main(int argc, char *argv[]) {
                 Vec3b imgR_values = (x + disparity < width) ? static_cast<Vec3b>(pImgR[x + disparity]) : imgL_values;
                 switch (nodeNorm) {
                     case 0:
-                        p = 1.0f - absolute_norm(imgL_values, imgR_values) / 3*255.0f;
+                        p = 1.0f - absolute_norm(imgL_values, imgR_values) / 255.0f;
                         break;
                     case 1:
-                        p = 1.0f - manhattan_norm(imgL_values, imgR_values) / 3*255.0f;
+                        p = 1.0f - manhattan_norm(imgL_values, imgR_values) / 255.0f;
                         break;
                     case 2:
-                        p = 1.0f - euclidean_norm(imgL_values, imgR_values) / 3*255.0f;
+                        p = 1.0f - euclidean_norm(imgL_values, imgR_values) / 255.0f;
                         break;
                     case 3:
-                        p = 1.0f - p_norm(imgL_values, imgR_values, p_value) / 3*255.0f;
+                        p = 1.0f - p_norm(imgL_values, imgR_values, p_value) / 255.0f;
                         break;
                     default:
-                        p = 1.0f - absolute_norm(imgL_values, imgR_values) / 3*255.0f;
+                        p = 1.0f - absolute_norm(imgL_values, imgR_values) / 255.0f;
                         break;
                 }
                 nodePot.at<float>(s, 0) = p * p;
