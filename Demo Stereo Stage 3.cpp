@@ -9,7 +9,6 @@ void print_help(char *argv0) {
     printf("Usage: %s left_image right_image min_disparity max_disparity node_norm_function edge_training_model right_image_groundtruth right_image_features output_disparity\n", argv0);
     
     printf("\nNode norm function:\n");
-    printf("0: Zero norm\n");
     printf("1: Manhattan norm\n");
     printf("2: Euclidean norm\n");
     printf("3: P-norm\n");
@@ -18,14 +17,6 @@ void print_help(char *argv0) {
     printf("0: Potts Model\n");
     printf("1: Contrast-Sensitive Potts Model\n");
     printf("2: Contrast-Sensitive Potts Model with Prior\n");
-}
-
-float zero_norm(Vec3b imgL_values, Vec3b imgR_values) {
-    float blue = abs(imgL_values[0] - imgR_values[0]);
-    float green = abs(imgL_values[1] - imgR_values[1]);
-    float red = abs(imgL_values[2] - imgR_values[2]);
-    float avg = (blue + green + red) / 3;
-    return (pow(2, -1)*avg) / (1+avg);
 }
 
 float manhattan_norm(Vec3b imgL_values, Vec3b imgR_values) {
@@ -52,17 +43,31 @@ float p_norm(Vec3b imgL_values, Vec3b imgR_values, int p) {
     return pow(sum, 1/p);
 }
 
-float meanSqrDist(Mat im1, Mat im2, int minDisparity, float scaleFactor) {
+float meanSqrDist(Mat solution, Mat gt, float scaleFactor) {
     float sum = 0;
-    for (int y = 0; y < im1.rows; y++) {
-        const byte *pM1 = im1.ptr<byte>(y);
-        const byte *pM2 = im2.ptr<byte>(y);
-        for (int x = 0; x < im1.cols; x++){
-            float difference = pM1[x] - ((pM2[x]-minDisparity)/scaleFactor);
-            sum += pow(abs(difference), 2);
+    for (int y = 0; y < solution.rows; y++) {
+        const byte *pM1 = solution.ptr<byte>(y);
+        const byte *pM2 = gt.ptr<byte>(y);
+        for (int x = 0; x < solution.cols; x++){
+            float difference = abs(pM1[x] - (pM2[x]));
+            sum += pow(difference, 2);
         }
     }
-    return sum / (im1.rows*im1.cols);
+    return sum / (solution.rows*solution.cols);
+}
+
+float badPixel(Mat solution, Mat gt, float scaleFactor) {
+    float threshold = 1;
+    float sum = 0;
+    for (int y = 0; y < solution.rows; y++) {
+        const byte *pM1 = solution.ptr<byte>(y);
+        const byte *pM2 = gt.ptr<byte>(y);
+        for (int x = 0; x < solution.cols; x++){
+            float difference = abs(pM1[x] - (pM2[x]));
+            if (difference <= threshold) sum++;
+        }
+    }
+    return sum / (solution.rows*solution.cols);
 }
 
 int main(int argc, char *argv[]) {
@@ -84,8 +89,14 @@ int main(int argc, char *argv[]) {
     
     int minDisparity    = atoi(argv[3]);
     int maxDisparity    = atoi(argv[4]);
-    int nodeNorm        = atoi(argv[5]);
+    int nodeNorm        = atoi(argv[5]);    if (nodeNorm < 1) { print_help(argv[0]); return 0; }
     int edgeModel       = atoi(argv[6]);    if (edgeModel > 2 || edgeModel < 0) { print_help(argv[0]); return 0; }
+    const int           width               = imgL.cols;
+    const int           height              = imgL.rows;
+    const unsigned int  nStates             = maxDisparity - minDisparity;
+    const word          nFeatures           = 3;
+    
+    const int           assertScaleFactor   = 255/nStates;
     
     PFM imgR_pfm;
     float* pimgR_pfm = imgR_pfm.read_pfm<float>(argv[7]);
@@ -94,18 +105,21 @@ int main(int argc, char *argv[]) {
     
     Mat imgR_fv = imread(argv[8], 1);       if (imgR_fv.empty()) printf("Can't open %s\n", argv[8]);
     resize(imgR_fv, imgR_fv, Size(imgR_fv.cols / gtScaleFactor, imgR_fv.rows / gtScaleFactor));
-        
-    const int           assertScaleFactor   = 255/(maxDisparity - minDisparity);
-    const int           width               = imgL.cols;
-    const int           height              = imgL.rows;
-    const unsigned int  nStates             = maxDisparity - minDisparity;
-    const word          nFeatures           = 3;
     
     // Preparing parameters for edge trainers
     vec_float_t            vParams = {100, 0.01f};
     if (edgeModel == 0 || edgeModel == 3) vParams.pop_back(); // Potts and Concat models only need 1 parameter
     
     auto                edgeTrainer = CTrainEdge::create(edgeModel, nStates, nFeatures);
+    
+    // Initializing Powell search class and parameters
+    const vec_float_t   vInitParams = { 100.0f, 300.0f, 3.0f, 10.0f };
+    const vec_float_t   vInitDeltas = {  10.0f,  10.0f, 1.0f,  1.0f };
+    vec_float_t         vEstParams  = vInitParams;                          // Actual model parameters
+    
+    CPowell powell(vEstParams.size());
+    powell.setInitParams(vInitParams);
+    powell.setDeltas(vInitDeltas);
     
     //  PairwiseGraph
     CGraphPairwise      graph(nStates);
@@ -116,15 +130,6 @@ int main(int argc, char *argv[]) {
 //    CGraphDense      graph(nStates);
 //    CGraphDenseExt   graphExt(graph);
 //    CInferDense      decoder(graph);
-    
-    // Initializing Powell search class and parameters
-    const vec_float_t   vInitParams = { 100.0f, 300.0f, 3.0f, 10.0f };
-    const vec_float_t   vInitDeltas = {  10.0f,  10.0f, 1.0f,  1.0f };
-    vec_float_t         vEstParams  = vInitParams;                          // Actual model parameters
-
-    CPowell powell(vEstParams.size());
-    powell.setInitParams(vInitParams);
-    powell.setDeltas(vInitDeltas);
     
     // ==================== Building the graph ====================
     Timer::start("Building the Graph... ");
@@ -154,9 +159,6 @@ int main(int argc, char *argv[]) {
                 int disparity = minDisparity + s;
                 Vec3b imgR_values = (x + disparity < width) ? static_cast<Vec3b>(pImgR[x + disparity]) : imgL_values;
                 switch (nodeNorm) {
-                    case 0:
-                        p = 1.0f - zero_norm(imgL_values, imgR_values) / 3*255.0f;
-                        break;
                     case 1:
                         p = 1.0f - manhattan_norm(imgL_values, imgR_values) / 3*255.0f;
                         break;
@@ -225,10 +227,10 @@ int main(int argc, char *argv[]) {
         optimalDecoding = decoder.decode(10);
         Timer::stop();
                 
-        // ====================== Evaluation =======================
+        // ====================== Powell Evaluation =======================
         Mat solution(imgL.size(), CV_8UC1, optimalDecoding.data());
         // compare solution with the groundtruth
-        float val = meanSqrDist(solution, imgR_gt, minDisparity, assertScaleFactor);
+        float val = meanSqrDist(solution, imgR_gt, minDisparity);
         
         printf("Iteration: %d, parameters: { ", i);
         for (const float& param : vEstParams) printf("%.1f ", param);
@@ -242,10 +244,18 @@ int main(int argc, char *argv[]) {
         
     }
     
-    // ============================ Visualization =============================
+    // ============================ Evaluation =============================
     Mat disparity(imgL.size(), CV_8UC1, optimalDecoding.data());
     disparity = (disparity + minDisparity) * (256 / maxDisparity);
     medianBlur(disparity, disparity, 3);
+    
+    float meanSqrdError = meanSqrDist(disparity, imgR_gt, assertScaleFactor);
+    float badError = badPixel(disparity, imgR_gt,  assertScaleFactor);
+    
+    // ============================ Visualization =============================
+    char error_str[255];
+    sprintf(error_str, "Mean squared: %.2f%% / Bad pixel: %.2f%%", meanSqrdError, badError);
+    putText(disparity, error_str, Point(width - 345, height - 25), cv::HersheyFonts::FONT_HERSHEY_SIMPLEX, 0.45, Scalar(0, 0, 0), 2, cv::LineTypes::LINE_AA);
     
     char dispStr[255];
     sprintf(dispStr, "Min-disparity: %d / Max-disparity: %d", minDisparity, maxDisparity);

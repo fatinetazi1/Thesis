@@ -1,27 +1,59 @@
 #include "DGM.h"
 #include "DGM/timer.h"
 
+#include "PFM.h"
+
 using namespace DirectGraphicalModels;
 
 void print_help(char *argv0) {
-    printf("Usage: %s left_image right_image min_disparity max_disparity output_disparity\n", argv0);
+    printf("Usage: %s left_image right_image min_disparity max_disparity right_image_groundtruth output_disparity\n", argv0);
+}
+
+float meanSqrDist(Mat solution, Mat gt, float scaleFactor) {
+    float sum = 0;
+    for (int y = 0; y < solution.rows; y++) {
+        const byte *pM1 = solution.ptr<byte>(y);
+        const byte *pM2 = gt.ptr<byte>(y);
+        for (int x = 0; x < solution.cols; x++){
+            float difference = abs(pM1[x] - (pM2[x]));
+            sum += pow(difference, 2);
+        }
+    }
+    return sum / (solution.rows*solution.cols);
+}
+
+float badPixel(Mat solution, Mat gt, float scaleFactor) {
+    float threshold = 1;
+    float sum = 0;
+    for (int y = 0; y < solution.rows; y++) {
+        const byte *pM1 = solution.ptr<byte>(y);
+        const byte *pM2 = gt.ptr<byte>(y);
+        for (int x = 0; x < solution.cols; x++){
+            float difference = abs(pM1[x] - (pM2[x]));
+            if (difference <= threshold) sum++;
+        }
+    }
+    return sum / (solution.rows*solution.cols);
 }
 
 int main(int argc, char *argv[]) {
     
-    if (argc != 6) {
+    if (argc != 7) {
         print_help(argv[0]);
         return 0;
     }
     
-    int gtScaleFactor = 6;
+    const int gtScaleFactor = 6;
 
     // Reading parameters and images
     Mat imgL = imread(argv[1], 0);          if (imgL.empty()) printf("Can't open %s\n", argv[1]);
     resize(imgL, imgL, Size(imgL.cols / gtScaleFactor, imgL.rows / gtScaleFactor));
     
     Mat imgR = imread(argv[2], 0);          if (imgR.empty()) printf("Can't open %s\n", argv[2]);
+    int rows = imgR.rows;
+    int cols = imgR.cols;
     resize(imgR, imgR, Size(imgR.cols / gtScaleFactor, imgR.rows / gtScaleFactor));
+    
     
     int       minDisparity  = atoi(argv[3]);
     int       maxDisparity  = atoi(argv[4]);
@@ -29,8 +61,15 @@ int main(int argc, char *argv[]) {
     int       height        = imgL.rows;
     unsigned int nStates    = maxDisparity - minDisparity;
     
-    CGraphPairwiseKit graphKit(nStates, INFER::TRW);
-//    CGraphDenseKit graphKit(nStates); // Uncomment for Dense graph model, comment line above.
+    const int assertScaleFactor   = 255/nStates;
+    
+    PFM imgR_pfm;
+    float* pimgR_pfm = imgR_pfm.read_pfm<float>(argv[5]);
+    Mat imgR_gt = Mat(rows, cols, CV_32FC1, pimgR_pfm);
+    resize(imgR_gt, imgR_gt, Size(imgR_gt.cols / gtScaleFactor, imgR_gt.rows / gtScaleFactor));
+    
+//    CGraphPairwiseKit graphKit(nStates, INFER::TRW);
+    CGraphDenseKit graphKit(nStates); // Uncomment for Dense graph model, comment line above.
     
     graphKit.getGraphExt().buildGraph(imgL.size());
     graphKit.getGraphExt().addDefaultEdgesModel(1.175f);
@@ -58,16 +97,24 @@ int main(int argc, char *argv[]) {
     vec_byte_t optimalDecoding = graphKit.getInfer().decode(10);
     Timer::stop();
     
-    // ============================ Visualization =============================
+    // ============================ Evaluation =============================
     Mat disparity(imgL.size(), CV_8UC1, optimalDecoding.data());
     disparity = (disparity + minDisparity) * (256 / maxDisparity);
     medianBlur(disparity, disparity, 3);
     
-    char str[255];
-    sprintf(str, "Min-disparity: %d / Max-disparity: %d", minDisparity, maxDisparity);
-    putText(disparity, str, Point(width - 290, height - 5), cv::HersheyFonts::FONT_HERSHEY_SIMPLEX, 0.45, Scalar(0, 0, 0), 2, cv::LineTypes::LINE_AA);
+    float meanSqrdError = meanSqrDist(disparity, imgR_gt, assertScaleFactor);
+    float badError = badPixel(disparity, imgR_gt,  assertScaleFactor);
     
-    imwrite(argv[5], disparity);
+    // ============================ Visualization =============================
+    char error_str[255];
+    sprintf(error_str, "Mean squared: %.2f%% / Bad pixel: %.2f%%", meanSqrdError, badError);
+    putText(disparity, error_str, Point(width - 345, height - 25), cv::HersheyFonts::FONT_HERSHEY_SIMPLEX, 0.45, Scalar(0, 0, 0), 2, cv::LineTypes::LINE_AA);
+    
+    char disp_str[255];
+    sprintf(disp_str, "Min-disparity: %d / Max-disparity: %d", minDisparity, maxDisparity);
+    putText(disparity, disp_str, Point(width - 290, height - 5), cv::HersheyFonts::FONT_HERSHEY_SIMPLEX, 0.45, Scalar(0, 0, 0), 2, cv::LineTypes::LINE_AA);
+    
+    imwrite(argv[6], disparity);
     imshow("Disparity", disparity);
     waitKey();
 

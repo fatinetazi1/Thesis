@@ -101,11 +101,11 @@ int main(int argc, char *argv[]) {
     Mat imgR_fv = imread(argv[8], 1);       if (imgR_fv.empty()) printf("Can't open %s\n", argv[8]);
     resize(imgR_fv, imgR_fv, Size(imgR_fv.cols / gtScaleFactor, imgR_fv.rows / gtScaleFactor));
         
-    const int           assertScaleFactor   = 255/(maxDisparity - minDisparity);
     const int           width               = imgL.cols;
     const int           height              = imgL.rows;
     const unsigned int  nStates             = maxDisparity - minDisparity;
     const word          nFeatures           = 3;
+    const int           assertScaleFactor   = 255/nStates;
     
     // Preparing parameters for edge trainers
     vec_float_t            vParams = {100, 0.01f};
