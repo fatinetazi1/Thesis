@@ -9,9 +9,18 @@ void print_help(char *argv0) {
     printf("Usage: %s left_image right_image min_disparity max_disparity node_norm_function right_image_groundtruth output_disparity\n", argv0);
     
     printf("\nNode norm function:\n");
+    printf("0: Absolute value norm\n");
     printf("1: Manhattan norm\n");
     printf("2: Euclidean norm\n");
     printf("3: P-norm\n");
+}
+
+float absolute_norm(Vec3b imgL_values, Vec3b imgR_values) {
+    float blue = abs(imgL_values[0] - imgR_values[0]);
+    float green = abs(imgL_values[1] - imgR_values[1]);
+    float red = abs(imgL_values[2] - imgR_values[2]);
+    float sum = blue + green + red;
+    return sum/3;
 }
 
 float manhattan_norm(Vec3b imgL_values, Vec3b imgR_values) {
@@ -85,7 +94,7 @@ int main(int argc, char *argv[]) {
     
     int             minDisparity    = atoi(argv[3]);
     int             maxDisparity    = atoi(argv[4]);
-    int             nodeNorm        = atoi(argv[5]); if (nodeNorm < 1) { print_help(argv[0]); return 0; }
+    int             nodeNorm        = atoi(argv[5]); // if (nodeNorm < 1) { print_help(argv[0]); return 0; }
     int             width           = imgL.cols;
     int             height          = imgL.rows;
     unsigned int    nStates         = maxDisparity - minDisparity;
@@ -121,6 +130,9 @@ int main(int argc, char *argv[]) {
                 int disparity = minDisparity + s;
                 Vec3b imgR_values = (x + disparity < width) ? static_cast<Vec3b>(pImgR[x + disparity]) : imgL_values;
                 switch (nodeNorm) {
+                    case 0:
+                        p = 1.0f - absolute_norm(imgL_values, imgR_values) / 3*255.0f;
+                        break;
                     case 1:
                         p = 1.0f - manhattan_norm(imgL_values, imgR_values) / 3*255.0f;
                         break;
@@ -131,7 +143,7 @@ int main(int argc, char *argv[]) {
                         p = 1.0f - p_norm(imgL_values, imgR_values, p_value) / 3*255.0f;
                         break;
                     default:
-                        p = 1.0f - manhattan_norm(imgL_values, imgR_values) / 3*255.0f;
+                        p = 1.0f - absolute_norm(imgL_values, imgR_values) / 3*255.0f;
                         break;
                 }
                 nodePot.at<float>(s, 0) = p * p;

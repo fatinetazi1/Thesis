@@ -9,6 +9,7 @@ void print_help(char *argv0) {
     printf("Usage: %s left_image right_image min_disparity max_disparity node_norm_function edge_training_model right_image_groundtruth right_image_features output_disparity\n", argv0);
     
     printf("\nNode norm function:\n");
+    printf("0: Absolute value norm\n");
     printf("1: Manhattan norm\n");
     printf("2: Euclidean norm\n");
     printf("3: P-norm\n");
@@ -17,6 +18,14 @@ void print_help(char *argv0) {
     printf("0: Potts Model\n");
     printf("1: Contrast-Sensitive Potts Model\n");
     printf("2: Contrast-Sensitive Potts Model with Prior\n");
+}
+
+float absolute_norm(Vec3b imgL_values, Vec3b imgR_values) {
+    float blue = abs(imgL_values[0] - imgR_values[0]);
+    float green = abs(imgL_values[1] - imgR_values[1]);
+    float red = abs(imgL_values[2] - imgR_values[2]);
+    float sum = blue + green + red;
+    return sum/3;
 }
 
 float manhattan_norm(Vec3b imgL_values, Vec3b imgR_values) {
@@ -89,7 +98,7 @@ int main(int argc, char *argv[]) {
     
     int minDisparity    = atoi(argv[3]);
     int maxDisparity    = atoi(argv[4]);
-    int nodeNorm        = atoi(argv[5]);    if (nodeNorm < 1) { print_help(argv[0]); return 0; }
+    int nodeNorm        = atoi(argv[5]);    
     int edgeModel       = atoi(argv[6]);    if (edgeModel > 2 || edgeModel < 0) { print_help(argv[0]); return 0; }
     const int           width               = imgL.cols;
     const int           height              = imgL.rows;
@@ -150,6 +159,9 @@ int main(int argc, char *argv[]) {
                 int disparity = minDisparity + s;
                 Vec3b imgR_values = (x + disparity < width) ? static_cast<Vec3b>(pImgR[x + disparity]) : imgL_values;
                 switch (nodeNorm) {
+                    case 0:
+                        p = 1.0f - absolute_norm(imgL_values, imgR_values) / 3*255.0f;
+                        break;
                     case 1:
                         p = 1.0f - manhattan_norm(imgL_values, imgR_values) / 3*255.0f;
                         break;
