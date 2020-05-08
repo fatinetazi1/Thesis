@@ -115,7 +115,7 @@ int main(int argc, char *argv[]) {
     
     // =============================== Decoding ===============================
     Timer::start("Decoding... ");
-    vec_byte_t optimalDecoding = graphKit.getInfer().decode(100);
+    vec_byte_t optimalDecoding = graphKit.getInfer().decode(10);
     Timer::stop();
     
     // ============================ Visualization =============================

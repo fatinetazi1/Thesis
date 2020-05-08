@@ -196,7 +196,7 @@ int main(int argc, char *argv[]) {
     
     // =============================== Decoding ===============================
     Timer::start("Decoding... ");
-    vec_byte_t optimalDecoding = decoder.decode(100);
+    vec_byte_t optimalDecoding = decoder.decode(10);
     Timer::stop();
     
     // ============================ Visualization =============================

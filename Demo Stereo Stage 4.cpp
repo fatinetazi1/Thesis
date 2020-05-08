@@ -228,7 +228,7 @@ int main(int argc, char *argv[]) {
         
         // =============================== Decoding ===============================
         Timer::start("Decoding... ");
-        optimalDecoding = decoder.decode(100);
+        optimalDecoding = decoder.decode(10);
         Timer::stop();
                 
         // ====================== Evaluation =======================
