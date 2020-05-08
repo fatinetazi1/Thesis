@@ -52,19 +52,6 @@ float p_norm(Vec3b imgL_values, Vec3b imgR_values, int p) {
     return pow(sum, 1/p);
 }
 
-float meanSqrDist(Mat im1, Mat im2, float scaleFactor = 1) {
-    float sum = 0;
-    for (int y = 0; y < im1.rows; y++) {
-        const byte *pM1 = im1.ptr<byte>(y);
-        const byte *pM2 = im2.ptr<byte>(y);
-        for (int x = 0; x < im1.cols; x++){
-            float difference = pM1[x] - (pM2[x]/scaleFactor);
-            sum += pow(abs(difference), 2);
-        }
-    }
-    return sum / (im1.rows*im1.cols);
-}
-
 float meanSqrDist(Mat im1, Mat im2, int minDisparity, float scaleFactor = 1) {
     float sum = 0;
     for (int y = 0; y < im1.rows; y++) {

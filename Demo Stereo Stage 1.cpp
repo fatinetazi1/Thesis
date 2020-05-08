@@ -13,13 +13,37 @@ void print_help(char *argv0) {
     printf("3: P-norm\n");
 }
 
-float zero_norm(float i) { return (pow(2, -1)*i) / (1+i); }
+float zero_norm(Vec3b imgL_values, Vec3b imgR_values) {
+    float blue = abs(imgL_values[0] - imgR_values[0]);
+    float green = abs(imgL_values[1] - imgR_values[1]);
+    float red = abs(imgL_values[2] - imgR_values[2]);
+    float avg = (blue + green + red) / 3;
+    return (pow(2, -1)*avg) / (1+avg);
+}
 
-float manhattan_norm(float i) { return abs(i); }
+float manhattan_norm(Vec3b imgL_values, Vec3b imgR_values) {
+    float blue = abs(imgL_values[0] - imgR_values[0]);
+    float green = abs(imgL_values[1] - imgR_values[1]);
+    float red = abs(imgL_values[2] - imgR_values[2]);
+    float sum = blue + green + red;
+    return sum;
+}
 
-float euclidean_norm(float i) { return sqrt(pow(abs(i), 2)); }
+float euclidean_norm(Vec3b imgL_values, Vec3b imgR_values) {
+    float blue = pow(abs(imgL_values[0] - imgR_values[0]), 2);
+    float green = pow(abs(imgL_values[1] - imgR_values[1]), 2);
+    float red = pow(abs(imgL_values[2] - imgR_values[2]), 2);
+    float sum = blue + green + red;
+    return sqrt(sum);
+}
 
-float p_norm(float i, int p) { return pow(pow(abs(i), p), 1/p); }
+float p_norm(Vec3b imgL_values, Vec3b imgR_values, int p) {
+    float blue = pow(abs(imgL_values[0] - imgR_values[0]), p);
+    float green = pow(abs(imgL_values[1] - imgR_values[1]), p);
+    float red = pow(abs(imgL_values[2] - imgR_values[2]), p);
+    float sum = blue + green + red;
+    return pow(sum, 1/p);
+}
 
 int main(int argc, char *argv[]) {
     
@@ -62,25 +86,25 @@ int main(int argc, char *argv[]) {
         byte * pImgL    = imgL.ptr<byte>(y);
         byte * pImgR    = imgR.ptr<byte>(y);
         for (int x = 0; x < width; x++) {
-            float imgL_value = static_cast<float>(pImgL[x]);
+            Vec3b imgL_values = static_cast<Vec3b>(pImgL[x]);
             for (unsigned int s = 0; s < nStates; s++) {                    // state
                 int disparity = minDisparity + s;
-                float imgR_value = (x + disparity < width) ? static_cast<float>(pImgR[x + disparity]) : imgL_value;
+                Vec3b imgR_values = (x + disparity < width) ? static_cast<Vec3b>(pImgR[x + disparity]) : imgL_values;
                 switch (nodeNorm) {
                     case 0:
-                        p = 1.0f - zero_norm(imgL_value - imgR_value) / 255.0f;
+                        p = 1.0f - zero_norm(imgL_values, imgR_values) / 3*255.0f;
                         break;
                     case 1:
-                        p = 1.0f - manhattan_norm(imgL_value - imgR_value) / 255.0f;
+                        p = 1.0f - manhattan_norm(imgL_values, imgR_values) / 3*255.0f;
                         break;
                     case 2:
-                        p = 1.0f - euclidean_norm(imgL_value - imgR_value) / 255.0f;
+                        p = 1.0f - euclidean_norm(imgL_values, imgR_values) / 3*255.0f;
                         break;
                     case 3:
-                        p = 1.0f - p_norm(imgL_value - imgR_value, p_value) / 255.0f;
+                        p = 1.0f - p_norm(imgL_values, imgR_values, p_value) / 3*255.0f;
                         break;
                     default:
-                        p = 1.0f - manhattan_norm(imgL_value - imgR_value) / 255.0f;
+                        p = 1.0f - manhattan_norm(imgL_values, imgR_values) / 3*255.0f;
                         break;
                 }
                 nodePot.at<float>(s, 0) = p * p;
