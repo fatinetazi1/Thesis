@@ -11,7 +11,6 @@ You can use any of the stages as a substitue for Demo Stereo.
 
 ### The Stages
 0. Demo Stereo without changes
-1. Demo Stereo with node development
-2. Demo Stereo with edge development
+1. Demo Stereo with node potential development
+2. Demo Stereo with edge potential development
 3. Demo Stereo with parameter estimation development
-4. Demo Stereo optimization
