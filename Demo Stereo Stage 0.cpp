@@ -15,7 +15,7 @@ float meanSqrDist(Mat solution, Mat gt, float scaleFactor) {
         const byte *pM1 = solution.ptr<byte>(y);
         const byte *pM2 = gt.ptr<byte>(y);
         for (int x = 0; x < solution.cols; x++){
-            float difference = abs(pM1[x] - (pM2[x]));
+            float difference = abs((pM1[x] - pM2[x])/pM2[x]);
             sum += pow(difference, 2);
         }
     }
