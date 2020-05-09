@@ -57,7 +57,7 @@ float meanAbs(Mat solution, Mat gt, float scaleFactor) {
             sum += percentage;
         }
     }
-    return sum / (solution.rows*solution.cols) * 100;
+    return sum / (solution.rows*solution.cols);
 }
 
 float badPixel(Mat solution, Mat gt, float scaleFactor) {
@@ -167,11 +167,11 @@ int main(int argc, char *argv[]) {
     
     // ============================ Visualization =============================
     char error_str[255];
-    sprintf(error_str, "Mean abs error: %.2f%% / Bad pixel: %.2f%%", meanError, badError);
-    putText(disparity, error_str, Point(width - 330, height - 25), cv::HersheyFonts::FONT_HERSHEY_SIMPLEX, 0.45, Scalar(0, 0, 0), 2, cv::LineTypes::LINE_AA);
+    sprintf(error_str, "Mean abs error: %.2f | Bad pixel: %.2f", meanError, badError);
+    putText(disparity, error_str, Point(width - 300, height - 25), cv::HersheyFonts::FONT_HERSHEY_SIMPLEX, 0.45, Scalar(0, 0, 0), 1, cv::LineTypes::LINE_AA);
     
     char disp_str[255];
-    sprintf(disp_str, "Min-disparity: %d / Max-disparity: %d", minDisparity, maxDisparity);
+    sprintf(disp_str, "Min-disparity: %d | Max-disparity: %d", minDisparity, maxDisparity);
     putText(disparity, disp_str, Point(width - 290, height - 5), cv::HersheyFonts::FONT_HERSHEY_SIMPLEX, 0.45, Scalar(0, 0, 0), 2, cv::LineTypes::LINE_AA);
     
     if (nodeNorm == 3) {
