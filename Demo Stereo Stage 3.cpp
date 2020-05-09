@@ -52,17 +52,17 @@ float p_norm(Vec3b imgL_values, Vec3b imgR_values, int p) {
     return pow(sum, 1/p);
 }
 
-float meanSqrDist(Mat solution, Mat gt, float scaleFactor) {
+float meanAbs(Mat solution, Mat gt, float scaleFactor) {
     float sum = 0;
     for (int y = 0; y < solution.rows; y++) {
         const byte *pM1 = solution.ptr<byte>(y);
         const byte *pM2 = gt.ptr<byte>(y);
         for (int x = 0; x < solution.cols; x++){
-            float difference = abs((pM1[x] - pM2[x])/pM2[x]);
-            sum += pow(difference, 2);
+            float percentage = pM2[x] ? abs(pM1[x] - pM2[x])/pM2[x] : abs(pM1[x] - pM2[x]);
+            sum += percentage;
         }
     }
-    return sum / (solution.rows*solution.cols);
+    return sum / (solution.rows*solution.cols) * 100;
 }
 
 float badPixel(Mat solution, Mat gt, float scaleFactor) {
@@ -73,7 +73,7 @@ float badPixel(Mat solution, Mat gt, float scaleFactor) {
         const byte *pM2 = gt.ptr<byte>(y);
         for (int x = 0; x < solution.cols; x++){
             float difference = abs(pM1[x] - (pM2[x]));
-            if (difference <= threshold) sum++;
+            if (difference >= threshold) sum++;
         }
     }
     return sum / (solution.rows*solution.cols);
@@ -242,11 +242,11 @@ int main(int argc, char *argv[]) {
         // ====================== Powell Evaluation =======================
         Mat solution(imgL.size(), CV_8UC1, optimalDecoding.data());
         // compare solution with the groundtruth
-        float val = meanSqrDist(solution, imgR_gt, minDisparity);
+        float val = 1 - meanAbs(solution, imgR_gt, minDisparity);
         
         printf("Iteration: %d, parameters: { ", i);
         for (const float& param : vEstParams) printf("%.1f ", param);
-        printf("}, Mean squared error: %.2f%%\n", val);
+        printf("}, accuracy: %.2f%%\n", val);
 
         if (powell.isConverged()) break;
         vEstParams = powell.getParams(val);
@@ -261,13 +261,13 @@ int main(int argc, char *argv[]) {
     disparity = (disparity + minDisparity) * (256 / maxDisparity);
     medianBlur(disparity, disparity, 3);
     
-    float meanSqrdError = meanSqrDist(disparity, imgR_gt, assertScaleFactor);
+    float meanError = meanAbs(disparity, imgR_gt, assertScaleFactor);
     float badError = badPixel(disparity, imgR_gt,  assertScaleFactor);
     
     // ============================ Visualization =============================
     char error_str[255];
-    sprintf(error_str, "Mean squared: %.2f%% / Bad pixel: %.2f%%", meanSqrdError, badError);
-    putText(disparity, error_str, Point(width - 345, height - 25), cv::HersheyFonts::FONT_HERSHEY_SIMPLEX, 0.45, Scalar(0, 0, 0), 2, cv::LineTypes::LINE_AA);
+    sprintf(error_str, "Mean abs error: %.2f%% / Bad pixel: %.2f%%", meanError, badError);
+    putText(disparity, error_str, Point(width - 330, height - 25), cv::HersheyFonts::FONT_HERSHEY_SIMPLEX, 0.45, Scalar(0, 0, 0), 2, cv::LineTypes::LINE_AA);
     
     char dispStr[255];
     sprintf(dispStr, "Min-disparity: %d / Max-disparity: %d", minDisparity, maxDisparity);

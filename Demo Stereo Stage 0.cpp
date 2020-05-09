@@ -9,17 +9,17 @@ void print_help(char *argv0) {
     printf("Usage: %s left_image right_image min_disparity max_disparity right_image_groundtruth output_disparity\n", argv0);
 }
 
-float meanSqrDist(Mat solution, Mat gt, float scaleFactor) {
+float meanAbs(Mat solution, Mat gt, float scaleFactor) {
     float sum = 0;
     for (int y = 0; y < solution.rows; y++) {
         const byte *pM1 = solution.ptr<byte>(y);
         const byte *pM2 = gt.ptr<byte>(y);
         for (int x = 0; x < solution.cols; x++){
-            float difference = abs((pM1[x] - pM2[x])/pM2[x]);
-            sum += pow(difference, 2);
+            float percentage = pM2[x] ? abs(pM1[x] - pM2[x])/pM2[x] : abs(pM1[x] - pM2[x]);
+            sum += percentage;
         }
     }
-    return sum / (solution.rows*solution.cols);
+    return sum / (solution.rows*solution.cols) * 100;
 }
 
 float badPixel(Mat solution, Mat gt, float scaleFactor) {
@@ -30,7 +30,7 @@ float badPixel(Mat solution, Mat gt, float scaleFactor) {
         const byte *pM2 = gt.ptr<byte>(y);
         for (int x = 0; x < solution.cols; x++){
             float difference = abs(pM1[x] - (pM2[x]));
-            if (difference <= threshold) sum++;
+            if (difference >= threshold) sum++;
         }
     }
     return sum / (solution.rows*solution.cols);
@@ -68,8 +68,8 @@ int main(int argc, char *argv[]) {
     Mat imgR_gt = Mat(rows, cols, CV_32FC1, pimgR_pfm);
     resize(imgR_gt, imgR_gt, Size(imgR_gt.cols / gtScaleFactor, imgR_gt.rows / gtScaleFactor));
     
-//    CGraphPairwiseKit graphKit(nStates, INFER::TRW);
-    CGraphDenseKit graphKit(nStates); // Uncomment for Dense graph model, comment line above.
+    CGraphPairwiseKit graphKit(nStates, INFER::TRW);
+//    CGraphDenseKit graphKit(nStates); // Uncomment for Dense graph model, comment line above.
     
     graphKit.getGraphExt().buildGraph(imgL.size());
     graphKit.getGraphExt().addDefaultEdgesModel(1.175f);
@@ -102,17 +102,17 @@ int main(int argc, char *argv[]) {
     disparity = (disparity + minDisparity) * (256 / maxDisparity);
     medianBlur(disparity, disparity, 3);
     
-    float meanSqrdError = meanSqrDist(disparity, imgR_gt, assertScaleFactor);
+    float meanError = meanAbs(disparity, imgR_gt, assertScaleFactor);
     float badError = badPixel(disparity, imgR_gt,  assertScaleFactor);
     
     // ============================ Visualization =============================
     char error_str[255];
-    sprintf(error_str, "Mean squared: %.2f%% / Bad pixel: %.2f%%", meanSqrdError, badError);
-    putText(disparity, error_str, Point(width - 345, height - 25), cv::HersheyFonts::FONT_HERSHEY_SIMPLEX, 0.45, Scalar(0, 0, 0), 2, cv::LineTypes::LINE_AA);
+    sprintf(error_str, "Mean abs error: %.2f%% / Bad pixel: %.2f%%", meanError, badError);
+    putText(disparity, error_str, Point(width - 330, height - 25), cv::HersheyFonts::FONT_HERSHEY_SIMPLEX, 0.45, Scalar(0, 0, 0), 1, cv::LineTypes::LINE_AA);
     
     char disp_str[255];
     sprintf(disp_str, "Min-disparity: %d / Max-disparity: %d", minDisparity, maxDisparity);
-    putText(disparity, disp_str, Point(width - 290, height - 5), cv::HersheyFonts::FONT_HERSHEY_SIMPLEX, 0.45, Scalar(0, 0, 0), 2, cv::LineTypes::LINE_AA);
+    putText(disparity, disp_str, Point(width - 290, height - 5), cv::HersheyFonts::FONT_HERSHEY_SIMPLEX, 0.45, Scalar(0, 0, 0), 1, cv::LineTypes::LINE_AA);
     
     imwrite(argv[6], disparity);
     imshow("Disparity", disparity);
