@@ -115,20 +115,19 @@ int main(int argc, char *argv[]) {
     Mat imgR_fv = imread(argv[8], 1);       if (imgR_fv.empty()) printf("Can't open %s\n", argv[8]);
     resize(imgR_fv, imgR_fv, Size(imgR_fv.cols / gtScaleFactor, imgR_fv.rows / gtScaleFactor));
     
-    // Preparing parameters for edge trainers
-    vec_float_t            vParams = {100, 0.01f};
-    if (edgeModel == 0 || edgeModel == 3) vParams.pop_back(); // Potts and Concat models only need 1 parameter
+    // Preparing parameters for edge trainers and parameter estimation
+    vec_float_t   vParams = {100, 0.01f};
+    vec_float_t   vDeltas = {10.0f,  0.01f};
+    if (edgeModel == 0 || edgeModel == 3) { vParams.pop_back(); vDeltas.pop_back(); } // Potts and Concat models only need 1 parameter
     
     auto                edgeTrainer = CTrainEdge::create(edgeModel, nStates, nFeatures);
     
     // Initializing Powell search class and parameters
-    const vec_float_t   vInitParams = { 100.0f, 300.0f, 3.0f, 10.0f };
-    const vec_float_t   vInitDeltas = {  10.0f,  10.0f, 1.0f,  1.0f };
-    vec_float_t         vEstParams  = vInitParams;                          // Actual model parameters
+    vec_float_t vEstParams  = vParams;                          // Actual model parameters
     
     CPowell powell(vEstParams.size());
-    powell.setInitParams(vInitParams);
-    powell.setDeltas(vInitDeltas);
+    powell.setInitParams(vParams);
+    powell.setDeltas(vDeltas);
     
     //  PairwiseGraph
     CGraphPairwise      graph(nStates);
@@ -253,7 +252,6 @@ int main(int argc, char *argv[]) {
         // m_vNodes.clear();
         // m_vEdges.clear();
         // graph.reset();
-        
     }
     
     // ============================ Evaluation =============================
@@ -285,3 +283,4 @@ int main(int argc, char *argv[]) {
 
     return 0;
 }
+

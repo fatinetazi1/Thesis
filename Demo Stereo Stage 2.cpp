@@ -122,14 +122,14 @@ int main(int argc, char *argv[]) {
     auto                edgeTrainer = CTrainEdge::create(edgeModel, nStates, nFeatures);
     
     //  PairwiseGraph
-//    CGraphPairwise      graph(nStates);
-//    CGraphPairwiseExt   graphExt(graph);
-//    CInferLBP           decoder(graph);
+    CGraphPairwise      graph(nStates);
+    CGraphPairwiseExt   graphExt(graph);
+    CInferLBP           decoder(graph);
     
     //    DenseGraph: Uncomment block below for dense graph. Comment block above.
-    CGraphDense      graph(nStates);
-    CGraphDenseExt   graphExt(graph);
-    CInferDense      decoder(graph);
+//    CGraphDense      graph(nStates);
+//    CGraphDenseExt   graphExt(graph);
+//    CInferDense      decoder(graph);
     
     // ==================== Building the graph ====================
     Timer::start("Building the Graph... ");
@@ -217,8 +217,8 @@ int main(int argc, char *argv[]) {
             graph.setNode(idx, nPotBase);
          } // x
      } // y
-//    graphExt.fillEdges(*edgeTrainer, imgR_fv, vParams);    // Filling-in the graph edges with pairwise potentials
-    graphExt.addDefaultEdgesModel(imgR_fv, 1.175f);  // Uncomment for dense graph. Comment line above.
+    graphExt.fillEdges(*edgeTrainer, imgR_fv, vParams);    // Filling-in the graph edges with pairwise potentials
+//    graphExt.addDefaultEdgesModel(imgR_fv, 1.175f);  // Uncomment for dense graph. Comment line above.
     Timer::stop();
     
     // =============================== Decoding ===============================
