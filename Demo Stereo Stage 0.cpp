@@ -23,14 +23,14 @@ float meanAbs(Mat solution, Mat gt, float scaleFactor) {
 }
 
 float badPixel(Mat solution, Mat gt, float scaleFactor) {
-    float threshold = 1;
+    float threshold = 2;
     float sum = 0;
     for (int y = 0; y < solution.rows; y++) {
         const byte *pM1 = solution.ptr<byte>(y);
         const byte *pM2 = gt.ptr<byte>(y);
         for (int x = 0; x < solution.cols; x++){
             float difference = abs(pM1[x] - (pM2[x]));
-            if (difference >= threshold) sum++;
+            if (difference > threshold) sum++;
         }
     }
     return sum / (solution.rows*solution.cols);
@@ -99,13 +99,13 @@ int main(int argc, char *argv[]) {
     
     // ============================ Evaluation =============================
     Mat disparity(imgL.size(), CV_8UC1, optimalDecoding.data());
-    disparity = (disparity + minDisparity) * (256 / maxDisparity);
-    medianBlur(disparity, disparity, 3);
-    
     float meanError = meanAbs(disparity, imgR_gt, assertScaleFactor);
     float badError = badPixel(disparity, imgR_gt,  assertScaleFactor);
     
     // ============================ Visualization =============================
+    disparity = (disparity + minDisparity) * (256 / maxDisparity);
+    medianBlur(disparity, disparity, 3);
+    
     char error_str[255];
     sprintf(error_str, "Mean abs error: %.2f | Bad pixel: %.2f", meanError, badError);
     putText(disparity, error_str, Point(width - 300, height - 25), cv::HersheyFonts::FONT_HERSHEY_SIMPLEX, 0.45, Scalar(0, 0, 0), 1, cv::LineTypes::LINE_AA);

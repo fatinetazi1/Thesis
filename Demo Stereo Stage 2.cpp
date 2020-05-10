@@ -66,14 +66,14 @@ float meanAbs(Mat solution, Mat gt, float scaleFactor) {
 }
 
 float badPixel(Mat solution, Mat gt, float scaleFactor) {
-    float threshold = 1;
+    float threshold = 2;
     float sum = 0;
     for (int y = 0; y < solution.rows; y++) {
         const byte *pM1 = solution.ptr<byte>(y);
         const byte *pM2 = gt.ptr<byte>(y);
         for (int x = 0; x < solution.cols; x++){
             float difference = abs(pM1[x] - (pM2[x]));
-            if (difference >= threshold) sum++;
+            if (difference > threshold) sum++;
         }
     }
     return sum / (solution.rows*solution.cols);
@@ -98,7 +98,7 @@ int main(int argc, char *argv[]) {
     
     int minDisparity    = atoi(argv[3]);
     int maxDisparity    = atoi(argv[4]);
-    int nodeNorm        = atoi(argv[5]);    
+    int nodeNorm        = atoi(argv[5]);
     int edgeModel       = atoi(argv[6]);    if (edgeModel > 2 || edgeModel < 0) { print_help(argv[0]); return 0; }
     const int           width               = imgL.cols;
     const int           height              = imgL.rows;
@@ -122,14 +122,14 @@ int main(int argc, char *argv[]) {
     auto                edgeTrainer = CTrainEdge::create(edgeModel, nStates, nFeatures);
     
     //  PairwiseGraph
-    CGraphPairwise      graph(nStates);
-    CGraphPairwiseExt   graphExt(graph);
-    CInferLBP           decoder(graph);
+//    CGraphPairwise      graph(nStates);
+//    CGraphPairwiseExt   graphExt(graph);
+//    CInferLBP           decoder(graph);
     
     //    DenseGraph: Uncomment block below for dense graph. Comment block above.
-//    CGraphDense      graph(nStates);
-//    CGraphDenseExt   graphExt(graph);
-//    CInferDense      decoder(graph);
+    CGraphDense      graph(nStates);
+    CGraphDenseExt   graphExt(graph);
+    CInferDense      decoder(graph);
     
     // ==================== Building the graph ====================
     Timer::start("Building the Graph... ");
@@ -217,8 +217,8 @@ int main(int argc, char *argv[]) {
             graph.setNode(idx, nPotBase);
          } // x
      } // y
-    graphExt.fillEdges(*edgeTrainer, imgR_fv, vParams);    // Filling-in the graph edges with pairwise potentials
-//    graphExt.addDefaultEdgesModel(imgR_fv, 1.175f);  // Uncomment for dense graph. Comment line above.
+//    graphExt.fillEdges(*edgeTrainer, imgR_fv, vParams);    // Filling-in the graph edges with pairwise potentials
+    graphExt.addDefaultEdgesModel(imgR_fv, 1.175f);  // Uncomment for dense graph. Comment line above.
     Timer::stop();
     
     // =============================== Decoding ===============================
@@ -228,13 +228,13 @@ int main(int argc, char *argv[]) {
     
     // ============================ Evaluation =============================
     Mat disparity(imgL.size(), CV_8UC1, optimalDecoding.data());
-    disparity = (disparity + minDisparity) * (256 / maxDisparity);
-    medianBlur(disparity, disparity, 3);
-    
     float meanError = meanAbs(disparity, imgR_gt, assertScaleFactor);
     float badError = badPixel(disparity, imgR_gt,  assertScaleFactor);
     
     // ============================ Visualization =============================
+    disparity = (disparity + minDisparity) * (256 / maxDisparity);
+    medianBlur(disparity, disparity, 3);
+    
     char error_str[255];
     sprintf(error_str, "Mean abs error: %.2f | Bad pixel: %.2f", meanError, badError);
     putText(disparity, error_str, Point(width - 300, height - 25), cv::HersheyFonts::FONT_HERSHEY_SIMPLEX, 0.45, Scalar(0, 0, 0), 1, cv::LineTypes::LINE_AA);
