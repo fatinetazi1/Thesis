@@ -10,7 +10,7 @@ Please install DGM on your machine. You can find the installation guidelines [he
 You can use any of the stages as a substitue for Demo Stereo. 
 
 ### The Stages
-0. Demo Stereo without changes
+0. Demo Stereo with error estimation development
 1. Demo Stereo with node potential development
 2. Demo Stereo with edge potential development
 3. Demo Stereo with parameter estimation development
