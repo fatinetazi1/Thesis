@@ -15,7 +15,9 @@ float meanAbs(Mat solution, Mat gt, float scaleFactor) {
         const byte *pM1 = solution.ptr<byte>(y);
         const byte *pM2 = gt.ptr<byte>(y);
         for (int x = 0; x < solution.cols; x++){
-            float percentage = pM2[x] ? abs(pM1[x] - pM2[x])/pM2[x] : abs(pM1[x] - pM2[x]);
+            float res = static_cast<float>(pM1[x]);
+            float gt = static_cast<float>(pM2[x]);
+            float percentage = gt ? abs(res - gt)/gt : abs(res - gt);
             sum += percentage;
         }
     }
@@ -23,13 +25,15 @@ float meanAbs(Mat solution, Mat gt, float scaleFactor) {
 }
 
 float badPixel(Mat solution, Mat gt, float scaleFactor) {
-    float threshold = 2;
+    float threshold = 1;
     float sum = 0;
     for (int y = 0; y < solution.rows; y++) {
         const byte *pM1 = solution.ptr<byte>(y);
         const byte *pM2 = gt.ptr<byte>(y);
         for (int x = 0; x < solution.cols; x++){
-            float difference = abs(pM1[x] - (pM2[x]));
+            float res = static_cast<float>(pM1[x]);
+            float gt = static_cast<float>(pM2[x]);
+            float difference = abs(res - gt);
             if (difference > threshold) sum++;
         }
     }
