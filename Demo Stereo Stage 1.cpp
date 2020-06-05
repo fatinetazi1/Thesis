@@ -5,45 +5,7 @@
 using namespace DirectGraphicalModels;
 
 void print_help(char* argv0) {
-    printf("Usage: %s left_image right_image min_disparity max_disparity node_norm_function right_image_groundtruth image_features_folder output_disparity\n", argv0);
-    
-    printf("\nNode norm function:\n");
-    printf("0: Absolute value norm\n");
-    printf("1: Manhattan norm\n");
-    printf("2: Euclidean norm\n");
-    printf("3: P-norm\n");
-}
-
-float absolute_norm(Vec3b imgL_values, Vec3b imgR_values) {
-    float blue = abs(imgL_values[0] - imgR_values[0]);
-    float green = abs(imgL_values[1] - imgR_values[1]);
-    float red = abs(imgL_values[2] - imgR_values[2]);
-    float sum = blue + green + red;
-    return sum/3;
-}
-
-float manhattan_norm(Vec3b imgL_values, Vec3b imgR_values) {
-    float blue = abs(imgL_values[0] - imgR_values[0]);
-    float green = abs(imgL_values[1] - imgR_values[1]);
-    float red = abs(imgL_values[2] - imgR_values[2]);
-    float sum = blue + green + red;
-    return sum;
-}
-
-float euclidean_norm(Vec3b imgL_values, Vec3b imgR_values) {
-    float blue = pow(abs(imgL_values[0] - imgR_values[0]), 2);
-    float green = pow(abs(imgL_values[1] - imgR_values[1]), 2);
-    float red = pow(abs(imgL_values[2] - imgR_values[2]), 2);
-    float sum = blue + green + red;
-    return sqrt(sum);
-}
-
-float p_norm(Vec3b imgL_values, Vec3b imgR_values, int p) {
-    float blue = pow(abs(imgL_values[0] - imgR_values[0]), p);
-    float green = pow(abs(imgL_values[1] - imgR_values[1]), p);
-    float red = pow(abs(imgL_values[2] - imgR_values[2]), p);
-    float sum = blue + green + red;
-    return pow(sum, 1/p);
+    printf("Usage: %s left_image right_image min_disparity max_disparity left_image_groundtruth image_features_folder output_disparity\n", argv0);
 }
 
 float meanAbs(Mat solution, Mat gt) {
@@ -62,6 +24,9 @@ float meanAbs(Mat solution, Mat gt) {
 }
 
 float badPixel(Mat solution, Mat gt) {
+    Mat clone = solution.clone();
+    cv::cvtColor(clone, clone, cv::COLOR_GRAY2BGR);
+    
     const float threshold = 1;
     float sum = 0;
     for (int y = 0; y < solution.rows; y++) {
@@ -71,15 +36,27 @@ float badPixel(Mat solution, Mat gt) {
             float solution_val = static_cast<float>(pSolution[x]);
             float gt_val = static_cast<float>(pGT[x]);
             float difference = fabs(solution_val - gt_val);
-            if (difference >= threshold) sum++;
+            if (difference >= threshold) {
+                Vec3b error = clone.at<Vec3b>(Point(x,y));
+                error[0] = 0;
+                error[1] = 0;
+                error[2] = 255;
+                clone.at<Vec3b>(Point(x,y)) = error;
+                sum++;
+            }
         }
     }
+    imshow("Solution", solution);
+    waitKey();
+    imshow("Error", clone);
+    waitKey();
+    
     return 100 * sum / (solution.rows * solution.cols);
 }
 
 int main(int argc, char* argv[]) {
 
-    if (argc != 9) {
+    if (argc != 8) {
         print_help(argv[0]);
         return 0;
     }
@@ -90,11 +67,10 @@ int main(int argc, char* argv[]) {
     
     int       minDisparity = atoi(argv[3]);
     int       maxDisparity = atoi(argv[4]);
-    int       nodeNorm     = atoi(argv[5]);
     unsigned int nStates = maxDisparity - minDisparity;
 
     PFM imgR_pfm;
-    float* pimgR_pfm = imgR_pfm.read_pfm<float>(argv[6]);
+    float* pimgR_pfm = imgR_pfm.read_pfm<float>(argv[5]);
     Mat imgR_gt = Mat(imgR.size(), CV_32FC1, pimgR_pfm);
     
     // Scaling
@@ -111,8 +87,8 @@ int main(int argc, char* argv[]) {
     Mat fexL[features];
     Mat fexR[features];
     for (size_t ch = 0; ch < features; ch++) {
-        fexL[ch] = imread(std::string(argv[7]) + std::string("fexL") + std::to_string(ch) +  std::string(".png"));
-        fexR[ch] = imread(std::string(argv[7]) + std::string("fexR") + std::to_string(ch) +  std::string(".png"));
+        fexL[ch] = imread(std::string(argv[6]) + std::string("fexL") + std::to_string(ch) +  std::string(".png"));
+        fexR[ch] = imread(std::string(argv[6]) + std::string("fexR") + std::to_string(ch) +  std::string(".png"));
     }
 
     CGraphPairwiseKit graphKit(nStates, INFER::TRW);
@@ -123,37 +99,15 @@ int main(int argc, char* argv[]) {
     // ==================== Filling the nodes of the graph ====================
     Mat nodePot(nStates, 1, CV_32FC1);                                      // node Potential (column-vector)
     size_t idx = 0;
-    float p, p1, p2;
-    int p_value = 0;                                                        // user input
-    if (nodeNorm == 3) {
-        printf( "Enter a p-value : ");
-        scanf("%d", &p_value);
-    }
     for (int y = 0; y < height; y++) {
         byte* pImgL = imgL.ptr<byte>(y);
         byte* pImgR = imgR.ptr<byte>(y);
         for (int x = 0; x < width; x++) {
-            Vec3b imgL_values = static_cast<Vec3b>(pImgL[x]);
+            float imgL_value = static_cast<float>(pImgL[x]);
             for (unsigned int s = 0; s < nStates; s++) {                    // state
                 int disparity = minDisparity + s;
-                Vec3b imgR_values = (x + disparity < width) ? static_cast<Vec3b>(pImgR[x + disparity]) : imgL_values;
-                switch (nodeNorm) {
-                    case 0:
-                        p1 = 1.0f - absolute_norm(imgL_values, imgR_values) / 255.0f;
-                        break;
-                    case 1:
-                        p1 = 1.0f - manhattan_norm(imgL_values, imgR_values) / 255.0f;
-                        break;
-                    case 2:
-                        p1 = 1.0f - euclidean_norm(imgL_values, imgR_values) / 255.0f;
-                        break;
-                    case 3:
-                        p1 = 1.0f - p_norm(imgL_values, imgR_values, p_value) / 255.0f;
-                        break;
-                    default:
-                        p1 = 1.0f - absolute_norm(imgL_values, imgR_values) / 255.0f;
-                        break;
-                }
+                float imgR_value = (x + disparity < width) ? static_cast<float>(pImgR[x + disparity]) : imgL_value;
+                float p1 = 1.0f - fabs(imgL_value - imgR_value) / 255.0f;
                 float sum = 0;
                 for (size_t ch = 0; ch < features; ch++) {
                     byte* pFexL = fexL[ch].ptr<byte>(y);
@@ -162,8 +116,8 @@ int main(int argc, char* argv[]) {
                     float val_r = static_cast<float>(pFexR[x]);
                     sum += fabs(val_l - val_r) / 255;
                 }
-                p2 = (1.0f - sum / features);
-                p = p1 * p2;
+                float p2 = 1.0f - sum / features;
+                float p = 0.40*p1 * 0.60*p2;
                 nodePot.at<float>(s, 0) = p * p;
             }
             graphKit.getGraph().setNode(idx++, nodePot);
@@ -197,9 +151,40 @@ int main(int argc, char* argv[]) {
     sprintf(disp_str, "Min-disparity: %d | Max-disparity: %d", minDisparity, maxDisparity);
     putText(disparity, disp_str, Point(width - 290, height - 5), cv::HersheyFonts::FONT_HERSHEY_SIMPLEX, 0.45, Scalar(0, 0, 0), 1, cv::LineTypes::LINE_AA);
 
-    imwrite(argv[8], disparity);
     imshow("Disparity", disparity);
     waitKey();
+    imwrite(argv[7], disparity);
 
     return 0;
 }
+
+//float manhattan_norm(Vec3b imgL_values, Vec3b imgR_values) {
+//    float blue = abs(imgL_values[0] - imgR_values[0]);
+//    float green = abs(imgL_values[1] - imgR_values[1]);
+//    float red = abs(imgL_values[2] - imgR_values[2]);
+//    float sum = blue + green + red;
+//    return sum;
+//}
+
+//float euclidean_norm(Vec3b imgL_values, Vec3b imgR_values) {
+//    float blue = pow(abs(imgL_values[0] - imgR_values[0]), 2);
+//    float green = pow(abs(imgL_values[1] - imgR_values[1]), 2);
+//    float red = pow(abs(imgL_values[2] - imgR_values[2]), 2);
+//    float sum = blue + green + red;
+//    return sqrt(sum);
+//}
+
+//float euclidean_norm(float imgL_values, float imgR_values) {
+//    return sqrt(pow(fabs(imgL_values - imgR_values), 2));
+//}
+
+
+//            Vec3b imgL_values = static_cast<Vec3b>(pImgL[x]);
+//            for (unsigned int s = 0; s < nStates; s++) {                    // state
+//                int disparity = minDisparity + s;
+//                Vec3b imgR_values = (x + disparity < width) ? static_cast<Vec3b>(pImgR[x + disparity]) : imgL_values;
+//                float blue = imgL_values[0] - imgR_values[0];
+//                float green = imgL_values[1] - imgR_values[1];
+//                float red = imgL_values[2] - imgR_values[2];
+//                float avg = (blue + green + red)/3;
+//                float p1 = 1.0f - fabs(avg) / 255.0f;
