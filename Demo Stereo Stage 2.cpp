@@ -115,11 +115,19 @@ int main(int argc, char *argv[]) {
     Mat imgR_fv = imread(argv[8], 1);       if (imgR_fv.empty()) printf("Can't open %s\n", argv[8]);
     resize(imgR_fv, imgR_fv, Size(imgR_fv.cols / gtScaleFactor, imgR_fv.rows / gtScaleFactor));
     
-    // Preparing parameters for edge trainers
-    vec_float_t            vParams = {100, 0.01f};
-    if (edgeModel == 0 || edgeModel == 3) vParams.pop_back(); // Potts and Concat models only need 1 parameter
+    // Preparing parameters for edge trainers and parameter estimation
+    vec_float_t   vParams = {100, 0.01f};
+    vec_float_t   vDeltas = {10.0f,  0.01f};
+    if (edgeModel == 0 || edgeModel == 3) { vParams.pop_back(); vDeltas.pop_back(); } // Potts and Concat models only need 1 parameter
     
     auto                edgeTrainer = CTrainEdge::create(edgeModel, nStates, nFeatures);
+    
+    // Initializing Powell search class and parameters
+    vec_float_t vEstParams  = vParams;                          // Actual model parameters
+    
+    CPowell powell(vEstParams.size());
+    powell.setInitParams(vParams);
+    powell.setDeltas(vDeltas);
     
     //  PairwiseGraph
     CGraphPairwise      graph(nStates);
@@ -203,28 +211,48 @@ int main(int argc, char *argv[]) {
     edgeTrainer->train();
     Timer::stop();
     
-    // ==================== STAGE 3: Filling the Graph =====================
-    Timer::start("Filling the Graph... ");
-    // Filling in the node potentials
-    byte nStatesBase = static_cast<byte>(nodePot.channels());
-    Mat nPotBase(nStates, 1, CV_32FC1, Scalar(0.0f));
-    for (int y = 0; y < height; y++) {
-        const float *pPotBase = nodePot.ptr<float>(y);
-        for (int x = 0; x < width; x++) {
-            size_t idx = (y * width + x);
-            for (byte s = 0; s < nStatesBase; s++)
-                nPotBase.at<float>(s, 0) = pPotBase[nStatesBase * x + s];
-            graph.setNode(idx, nPotBase);
-         } // x
-     } // y
-    graphExt.fillEdges(*edgeTrainer, imgR_fv, vParams);    // Filling-in the graph edges with pairwise potentials
-//    graphExt.addDefaultEdgesModel(imgR_fv, 1.175f);  // Uncomment for dense graph. Comment line above.
-    Timer::stop();
+    vec_byte_t optimalDecoding;
     
-    // =============================== Decoding ===============================
-    Timer::start("Decoding... ");
-    vec_byte_t optimalDecoding = decoder.decode(10);
-    Timer::stop();
+    // Main loop of parameters optimization
+    for (int i = 1; ; i++) {
+        // ==================== STAGE 3: Filling the Graph =====================
+            Timer::start("Filling the Graph... ");
+            // Filling in the node potentials
+            byte nStatesBase = static_cast<byte>(nodePot.channels());
+            Mat nPotBase(nStates, 1, CV_32FC1, Scalar(0.0f));
+            for (int y = 0; y < height; y++) {
+                const float *pPotBase = nodePot.ptr<float>(y);
+                for (int x = 0; x < width; x++) {
+                    size_t idx = (y * width + x);
+                    for (byte s = 0; s < nStatesBase; s++)
+                        nPotBase.at<float>(s, 0) = pPotBase[nStatesBase * x + s];
+                    graph.setNode(idx, nPotBase);
+                 } // x
+             } // y
+            graphExt.fillEdges(*edgeTrainer, imgR_fv, vParams);    // Filling-in the graph edges with pairwise potentials
+//            graphExt.addDefaultEdgesModel(imgR_fv, 1.175f);  // Uncomment for dense graph. Comment line above.
+            Timer::stop();
+        
+        // =============================== Decoding ===============================
+        Timer::start("Decoding... ");
+        optimalDecoding = decoder.decode(10);
+        Timer::stop();
+                
+        // ====================== Powell Evaluation =======================
+        Mat solution(imgL.size(), CV_8UC1, optimalDecoding.data());
+        // compare solution with the groundtruth
+        float val = 1 - meanAbs(solution, imgR_gt, minDisparity);
+        
+        printf("Iteration: %d, parameters: { ", i);
+        for (const float& param : vEstParams) printf("%.1f ", param);
+        printf("}, accuracy: %.2f%%\n", val);
+
+        if (powell.isConverged()) break;
+        vEstParams = powell.getParams(val);
+        // m_vNodes.clear();
+        // m_vEdges.clear();
+        // graph.reset();
+    }
     
     // ============================ Evaluation =============================
     Mat disparity(imgL.size(), CV_8UC1, optimalDecoding.data());
