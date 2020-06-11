@@ -6,7 +6,7 @@
 using namespace DirectGraphicalModels;
 
 void print_help(char* argv0) {
-    printf("Usage: %s left_image right_image min_disparity max_disparity left_image_groundtruth output_disparity\n", argv0);
+    printf("Usage: %s right_image left_image min_disparity max_disparity right_image_groundtruth output_disparity\n", argv0);
 }
 
 float meanAbs(Mat solution, Mat gt) {
@@ -77,8 +77,8 @@ int main(int argc, char* argv[]) {
     }
 
     // Reading parameters and images
-    Mat imgL = imread(argv[1], useColor);          if (imgL.empty()) printf("Can't open %s\n", argv[1]);
-    Mat imgR = imread(argv[2], useColor);          if (imgR.empty()) printf("Can't open %s\n", argv[2]);
+    Mat imgR = imread(argv[1], useColor);          if (imgR.empty()) printf("Can't open %s\n", argv[1]);
+    Mat imgL = imread(argv[2], useColor);          if (imgL.empty()) printf("Can't open %s\n", argv[2]);
     
     int       minDisparity = atoi(argv[3]);
     int       maxDisparity = atoi(argv[4]);
@@ -95,13 +95,13 @@ int main(int argc, char* argv[]) {
     resize(imgR_gt, imgR_gt, Size(imgR_gt.cols / gtScaleFactor, imgR_gt.rows / gtScaleFactor)); //floating pont
     
     // Extracted SIFT Features
-    Mat siftL = fex::CSIFT::get(imgL);
     Mat siftR = fex::CSIFT::get(imgR);
+    Mat siftL = fex::CSIFT::get(imgL);
 
-    vec_mat_t fexL;
     vec_mat_t fexR;
-    split(siftL, fexL);
+    vec_mat_t fexL;
     split(siftR, fexR);
+    split(siftL, fexL);
     
     int       height        = imgL.rows;
     int       width         = imgL.cols;
@@ -119,18 +119,18 @@ int main(int argc, char* argv[]) {
     Mat nodePot(nStates, 1, CV_32FC1);                                      // node Potential (column-vector)
     size_t idx = 0;
     for (int y = 0; y < height; y++) {
-        byte* pImgL = imgL.ptr<byte>(y);
         byte* pImgR = imgR.ptr<byte>(y);
-        byte* pSiftL = siftL.ptr<byte>(y);
+        byte* pImgL = imgL.ptr<byte>(y);
         byte* pSiftR = siftR.ptr<byte>(y);
+        byte* pSiftL = siftL.ptr<byte>(y);
         for (int x = 0; x < width; x++) {
             // -------------------- RGB data --------------------
             vec_float_t sum_rgb(nStates, 0);
             for (int ch = 0; ch < rgbChannels; ch++) {                      // channel
-                float imgL_value = static_cast<float>(pImgL[rgbChannels * x + ch]);
+                float imgR_value = static_cast<float>(pImgR[rgbChannels * x + ch]);
                 for (unsigned int s = 0; s < nStates; s++) {                // state
                     int disparity = minDisparity + s;
-                    float imgR_value = (x - disparity >= 0) ? static_cast<float>(pImgR[rgbChannels * (x - disparity) + ch]) : static_cast<float>(pImgR[rgbChannels * x + ch]);
+                    float imgL_value = (x - disparity >= 0) ? static_cast<float>(pImgL[rgbChannels * (x - disparity) + ch]) : static_cast<float>(pImgL[rgbChannels * x + ch]);
                     sum_rgb[s] += fabs(imgL_value - imgR_value) / 255.0f;
                 } // s
             } // ch
@@ -138,10 +138,10 @@ int main(int argc, char* argv[]) {
             // -------------------- SIFT data --------------------
             vec_float_t sum_sift(nStates, 0);
             for (int ch = 0; ch < siftChannels; ch++) {                      // channel
-                float siftL_value = static_cast<float>(pSiftL[siftChannels * x + ch]);
+                float siftR_value = static_cast<float>(pSiftR[siftChannels * x + ch]);
                 for (unsigned int s = 0; s < nStates; s++) {                 // state
                     int disparity = minDisparity + s;
-                    float siftR_value = (x - disparity >= 0) ? static_cast<float>(pSiftR[siftChannels * (x - disparity) + ch]) : static_cast<float>(pSiftR[siftChannels * x + ch]);
+                    float siftL_value = (x - disparity >= 0) ? static_cast<float>(pSiftL[siftChannels * (x - disparity) + ch]) : static_cast<float>(pSiftL[siftChannels * x + ch]);
                     sum_sift[s] += fabs(siftL_value - siftR_value) / 255.0f;
                 } // s
             } // ch
