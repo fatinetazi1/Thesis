@@ -108,26 +108,27 @@ int main(int argc, char* argv[]) {
     int       rgbChannels   = imgL.channels();
     int       siftChannels  = siftL.channels();
     const float rgbW        = 0.88f;
+    const float siftW       = 1.00f - rgbW;
     float     edgeParam     = 1.175f;
     
     // Preparing parameters for parameter estimation
-    vec_float_t   vParams = {edgeParam, rgbW};
-    vec_float_t   vDeltas = {0.05f,  0.01f};
+    vec_float_t   vParams = {edgeParam, rgbW, siftW};
+    vec_float_t   vDeltas = {0.05f,  0.01f, 0.01f};
     
     // Initializing Powell search class and parameters
     CPowell powell(vParams.size());
     powell.setInitParams(vParams);
     powell.setDeltas(vDeltas);
-
-    // Graph building
+    
     CGraphPairwiseKit graphKit(nStates, INFER::TRW);
-    graphKit.getGraphExt().buildGraph(imgL.size());
-    graphKit.getGraphExt().addDefaultEdgesModel(edgeParam);
-
     vec_byte_t optimalDecoding;
     
     // Main loop of parameters optimization
     for (int i = 1; ; i++) {
+        // ==================== Graph building ====================
+        graphKit.getGraphExt().buildGraph(imgL.size());
+        graphKit.getGraphExt().addDefaultEdgesModel(vParams[0]);
+        
         // ==================== Filling the nodes of the graph ====================
         Mat nodePot(nStates, 1, CV_32FC1);                                      // node Potential (column-vector)
         size_t idx = 0;
@@ -163,7 +164,7 @@ int main(int argc, char* argv[]) {
                 for (unsigned int s = 0; s < nStates; s++) {
                     float p_rgb  = 1.0f - sum_rgb[s] / rgbChannels;
                     float p_sift = 1.0f - sum_sift[s] / siftChannels;
-                    float p = (rgbW * p_rgb) + ((1.00f - rgbW) * p_sift);
+                    float p = (vParams[1] * p_rgb) + (vParams[2] * p_sift);
                     nodePot.at<float>(s, 0) = p * p;
                 }
                 graphKit.getGraph().setNode(idx++, nodePot);
@@ -191,7 +192,6 @@ int main(int argc, char* argv[]) {
 
         if (powell.isConverged()) break;
         vParams = powell.getParams(accuracy);
-        graphKit.getGraph().reset();
     }
     
 
