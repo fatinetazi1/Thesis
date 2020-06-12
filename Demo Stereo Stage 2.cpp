@@ -191,7 +191,7 @@ int main(int argc, char* argv[]) {
 
         if (powell.isConverged()) break;
         vParams = powell.getParams(accuracy);
-//        graphKit.getGraph().reset();
+        graphKit.getGraph().reset();
     }
     
 
