@@ -27,7 +27,6 @@ float meanAbs(Mat solution, Mat gt) {
 float badPixel(const Mat& solution, const Mat& gt) {
     Mat clone = solution.clone();
     cv::cvtColor(clone, clone, cv::COLOR_GRAY2BGR);
-
     const float threshold = 1;
     float sum = 0;
     int pixels = 0;
@@ -51,9 +50,9 @@ float badPixel(const Mat& solution, const Mat& gt) {
         }
     }
     imshow("Solution", solution);
-    waitKey();
+    waitKey(5);
     imshow("Error", clone);
-    waitKey();
+    waitKey(5);
 
     return 100 * sum / pixels;
 }
@@ -103,17 +102,23 @@ int main(int argc, char* argv[]) {
     split(siftR, fexR);
     split(siftL, fexL);
     
+    // Extracting Gradient Features
+    Mat gradR = fex::CGradient::get(imgR) * 3;
+    Mat gradL = fex::CGradient::get(imgL) * 3;
+    
     int       height        = imgL.rows;
     int       width         = imgL.cols;
     int       rgbChannels   = imgL.channels();
     int       siftChannels  = siftL.channels();
-    const float rgbW        = 0.88f;
-    const float siftW       = 1.00f - rgbW;
+    int       gradChannels  = gradL.channels();
+    const float rgbW        = 0.50f;
+    const float siftW       = 0.50f;
+    const float gradW       = 0.30f;
     float     edgeParam     = 1.175f;
     
     // Preparing parameters for parameter estimation
-    vec_float_t   vParams = {edgeParam, rgbW, siftW};
-    vec_float_t   vDeltas = {0.05f,  0.01f, 0.01f};
+    vec_float_t   vParams = {edgeParam, rgbW, siftW, gradW};
+    vec_float_t   vDeltas = {0.1f,  0.1f, 0.1f, 0.1f};
     
     // Initializing Powell search class and parameters
     CPowell powell(vParams.size());
@@ -137,6 +142,8 @@ int main(int argc, char* argv[]) {
             byte* pImgL = imgL.ptr<byte>(y);
             byte* pSiftR = siftR.ptr<byte>(y);
             byte* pSiftL = siftL.ptr<byte>(y);
+            byte* pGradR = gradR.ptr<byte>(y);
+            byte* pGradL = gradL.ptr<byte>(y);
             for (int x = 0; x < width; x++) {
                 // -------------------- RGB data --------------------
                 vec_float_t sum_rgb(nStates, 0);
@@ -160,17 +167,29 @@ int main(int argc, char* argv[]) {
                     } // s
                 } // ch
                 
+                // -------------------- gradient data --------------------
+                vec_float_t sum_grad(nStates, 0);
+                for (int ch = 0; ch < gradChannels; ch++) {                      // channel
+                    float gradR_value = static_cast<float>(pGradR[siftChannels * x + ch]);
+                    for (unsigned int s = 0; s < nStates; s++) {                 // state
+                        int disparity = minDisparity + s;
+                        float gradL_value = (x - disparity >= 0) ? static_cast<float>(pGradL[siftChannels * (x - disparity) + ch]) : static_cast<float>(pGradL[siftChannels * x + ch]);
+                        sum_sift[s] += fabs(gradL_value - gradR_value) / 255.0f;
+                    } // s
+                } // ch
+                
                 // -------------------- Potential calculation --------------------
                 for (unsigned int s = 0; s < nStates; s++) {
                     float p_rgb  = 1.0f - sum_rgb[s] / rgbChannels;
                     float p_sift = 1.0f - sum_sift[s] / siftChannels;
-                    float p = (vParams[1] * p_rgb) + (vParams[2] * p_sift);
+                    float p_grad = 1.0f - sum_grad[s] / gradChannels;
+                    float p = (vParams[1] * p_rgb) + (vParams[2] * p_sift) + (vParams[3] * p_grad);
                     nodePot.at<float>(s, 0) = p * p;
                 }
                 graphKit.getGraph().setNode(idx++, nodePot);
             } // x
         } // y
-
+        
         // =============================== Decoding ===============================
         Timer::start("Decoding... ");
         optimalDecoding = graphKit.getInfer().decode(10);
@@ -183,19 +202,22 @@ int main(int argc, char* argv[]) {
         Mat gt;                                                        // the values are [minDisp; maxDisp]
         imgR_gt.convertTo(gt, CV_8UC1, 1.0 / gtScaleFactor);
         
-        float badError = badPixel(disparity, gt);
-        float accuracy = 100 - badError;
+        medianBlur(disparity, disparity, 3);
+        float bad = badPixel(disparity, gt);
+        float accuracy = 100 - bad;
         
         printf("Iteration: %d, parameters: { ", i);
-        for (const float& param : vParams) printf("%.1f ", param);
+        for (const float& param : vParams) printf("%.2f ", param);
         printf("}, accuracy: %.2f%%\n", accuracy);
 
         if (powell.isConverged()) break;
         vParams = powell.getParams(accuracy);
+        graphKit.getGraph().reset();
     }
     
 
     // ============================ Evaluation =============================
+    printf("Parameter Estimation Done \n");
     Mat disparity(imgL.size(), CV_8UC1, optimalDecoding.data());  // the values are [0; nStates] = [0; maxDisp - minDisp]
     disparity = disparity + minDisparity;
     Mat gt;                                                        // the values are [minDisp; maxDisp]
@@ -207,7 +229,7 @@ int main(int argc, char* argv[]) {
     // ============================ Visualization =============================
     disparity = disparity * (256 / maxDisparity);
     //disparity = disparity * gtScaleFactor;
-    medianBlur(disparity, disparity, 3);
+    //medianBlur(disparity, disparity, 3);
 
     char error_str[255];
     sprintf(error_str, "MSE: %.2f | Bad pixel percentage: %.2f %%", meanError, badError);

@@ -103,12 +103,18 @@ int main(int argc, char* argv[]) {
     split(siftR, fexR);
     split(siftL, fexL);
     
+    // Extracting Gradient Features
+    Mat gradR = fex::CGradient::get(imgR) * 3;
+    Mat gradL = fex::CGradient::get(imgL) * 3;
+    
     int       height        = imgL.rows;
     int       width         = imgL.cols;
     int       rgbChannels   = imgL.channels();
     int       siftChannels  = siftL.channels();
-    const float rgbW        = 0.88f;
-    const float siftW       = 1.00f - rgbW;
+    int       gradChannels  = gradL.channels();
+    const float rgbW        = 1.60f;
+    const float siftW       = 0.20f;
+    const float gradW       = 0.30f;
 
     CGraphPairwiseKit graphKit(nStates, INFER::TRW);
 
@@ -123,6 +129,8 @@ int main(int argc, char* argv[]) {
         byte* pImgL = imgL.ptr<byte>(y);
         byte* pSiftR = siftR.ptr<byte>(y);
         byte* pSiftL = siftL.ptr<byte>(y);
+        byte* pGradR = gradR.ptr<byte>(y);
+        byte* pGradL = gradL.ptr<byte>(y);
         for (int x = 0; x < width; x++) {
             // -------------------- RGB data --------------------
             vec_float_t sum_rgb(nStates, 0);
@@ -146,11 +154,23 @@ int main(int argc, char* argv[]) {
                 } // s
             } // ch
             
+            // -------------------- gradient data --------------------
+            vec_float_t sum_grad(nStates, 0);
+            for (int ch = 0; ch < gradChannels; ch++) {                      // channel
+                float gradR_value = static_cast<float>(pGradR[siftChannels * x + ch]);
+                for (unsigned int s = 0; s < nStates; s++) {                 // state
+                    int disparity = minDisparity + s;
+                    float gradL_value = (x - disparity >= 0) ? static_cast<float>(pGradL[siftChannels * (x - disparity) + ch]) : static_cast<float>(pGradL[siftChannels * x + ch]);
+                    sum_sift[s] += fabs(gradL_value - gradR_value) / 255.0f;
+                } // s
+            } // ch
+            
             // -------------------- Potential calculation --------------------
             for (unsigned int s = 0; s < nStates; s++) {
                 float p_rgb  = 1.0f - sum_rgb[s] / rgbChannels;
                 float p_sift = 1.0f - sum_sift[s] / siftChannels;
-                float p = (rgbW * p_rgb) + (siftW * p_sift);
+                float p_grad = 1.0f - sum_grad[s] / gradChannels;
+                float p = (rgbW * p_rgb) + (siftW * p_sift) + (gradW * p_grad);
                 nodePot.at<float>(s, 0) = p * p;
             }
             graphKit.getGraph().setNode(idx++, nodePot);
@@ -168,13 +188,14 @@ int main(int argc, char* argv[]) {
     Mat gt;                                                        // the values are [minDisp; maxDisp]
     imgR_gt.convertTo(gt, CV_8UC1, 1.0 / gtScaleFactor);
 
+    medianBlur(disparity, disparity, 3);
     float meanError = meanAbs(disparity, gt);
     float badError = badPixel(disparity, gt);
 
     // ============================ Visualization =============================
     disparity = disparity * (256 / maxDisparity);
     //disparity = disparity * gtScaleFactor;
-    medianBlur(disparity, disparity, 3);
+    //medianBlur(disparity, disparity, 3);
 
     char error_str[255];
     sprintf(error_str, "MSE: %.2f | Bad pixel percentage: %.2f %%", meanError, badError);
