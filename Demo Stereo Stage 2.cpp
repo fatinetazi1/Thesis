@@ -93,6 +93,10 @@ int main(int argc, char* argv[]) {
     resize(imgR, imgR, Size(imgR.cols / gtScaleFactor, imgR.rows / gtScaleFactor)); //byte
     resize(imgR_gt, imgR_gt, Size(imgR_gt.cols / gtScaleFactor, imgR_gt.rows / gtScaleFactor)); //floating pont
     
+    //Ground truth
+    Mat gt;
+    imgR_gt.convertTo(gt, CV_8UC1, 1.0 / gtScaleFactor);
+    
     // Extracted SIFT Features
     Mat siftR = fex::CSIFT::get(imgR);
     Mat siftL = fex::CSIFT::get(imgL);
@@ -113,7 +117,7 @@ int main(int argc, char* argv[]) {
     int       gradChannels  = gradL.channels();
     const float rgbW        = 0.50f;
     const float siftW       = 0.50f;
-    const float gradW       = 0.30f;
+    const float gradW       = 0.50f;
     float     edgeParam     = 1.175f;
     
     // Preparing parameters for parameter estimation
@@ -125,8 +129,9 @@ int main(int argc, char* argv[]) {
     powell.setInitParams(vParams);
     powell.setDeltas(vDeltas);
     
-    CGraphPairwiseKit graphKit(nStates, INFER::TRW);
+    CGraphPairwiseKit graphKit(nStates, INFER::Viterbi);
     vec_byte_t optimalDecoding;
+    Mat clone;
     
     // Main loop of parameters optimization
     for (int i = 1; ; i++) {
@@ -198,9 +203,7 @@ int main(int argc, char* argv[]) {
         // ====================== Powell Evaluation =======================
         Mat disparity(imgL.size(), CV_8UC1, optimalDecoding.data());  // the values are [0; nStates] = [0; maxDisp - minDisp]
         disparity = disparity + minDisparity;
-        
-        Mat gt;                                                        // the values are [minDisp; maxDisp]
-        imgR_gt.convertTo(gt, CV_8UC1, 1.0 / gtScaleFactor);
+        clone = disparity.clone();
         
         medianBlur(disparity, disparity, 3);
         float bad = badPixel(disparity, gt);
@@ -210,38 +213,35 @@ int main(int argc, char* argv[]) {
         for (const float& param : vParams) printf("%.2f ", param);
         printf("}, accuracy: %.2f%%\n", accuracy);
 
-        if (powell.isConverged()) break;
+        if (powell.isConverged()) {
+            clone = disparity.clone();
+            break;
+        }
         vParams = powell.getParams(accuracy);
         graphKit.getGraph().reset();
     }
-    
+    printf("Parameter Estimation Done \n");
 
     // ============================ Evaluation =============================
-    printf("Parameter Estimation Done \n");
-    Mat disparity(imgL.size(), CV_8UC1, optimalDecoding.data());  // the values are [0; nStates] = [0; maxDisp - minDisp]
-    disparity = disparity + minDisparity;
-    Mat gt;                                                        // the values are [minDisp; maxDisp]
-    imgR_gt.convertTo(gt, CV_8UC1, 1.0 / gtScaleFactor);
-
-    float meanError = meanAbs(disparity, gt);
-    float badError = badPixel(disparity, gt);
+    float meanError = meanAbs(clone, gt);
+    float badError = badPixel(clone, gt);
 
     // ============================ Visualization =============================
-    disparity = disparity * (256 / maxDisparity);
+    clone = clone * (256 / maxDisparity);
     //disparity = disparity * gtScaleFactor;
     //medianBlur(disparity, disparity, 3);
 
     char error_str[255];
     sprintf(error_str, "MSE: %.2f | Bad pixel percentage: %.2f %%", meanError, badError);
-    putText(disparity, error_str, Point(width - 320, height - 25), cv::HersheyFonts::FONT_HERSHEY_SIMPLEX, 0.45, Scalar(0, 0, 0), 1, cv::LineTypes::LINE_AA);
+    putText(clone, error_str, Point(width - 320, height - 25), cv::HersheyFonts::FONT_HERSHEY_SIMPLEX, 0.45, Scalar(0, 0, 0), 1, cv::LineTypes::LINE_AA);
 
     char disp_str[255];
     sprintf(disp_str, "Min-disparity: %d | Max-disparity: %d", minDisparity, maxDisparity);
-    putText(disparity, disp_str, Point(width - 290, height - 5), cv::HersheyFonts::FONT_HERSHEY_SIMPLEX, 0.45, Scalar(0, 0, 0), 1, cv::LineTypes::LINE_AA);
+    putText(clone, disp_str, Point(width - 290, height - 5), cv::HersheyFonts::FONT_HERSHEY_SIMPLEX, 0.45, Scalar(0, 0, 0), 1, cv::LineTypes::LINE_AA);
 
-    imshow("Disparity", disparity);
+    imshow("Disparity", clone);
     waitKey();
-    imwrite(argv[6], disparity);
+    imwrite(argv[6], clone);
 
     return 0;
 }

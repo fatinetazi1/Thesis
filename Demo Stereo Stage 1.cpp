@@ -116,7 +116,7 @@ int main(int argc, char* argv[]) {
     const float siftW       = 0.20f;
     const float gradW       = 0.30f;
 
-    CGraphPairwiseKit graphKit(nStates, INFER::TRW);
+    CGraphPairwiseKit graphKit(nStates, INFER::Viterbi);
 
     graphKit.getGraphExt().buildGraph(imgL.size());
     graphKit.getGraphExt().addDefaultEdgesModel(1.175f);
