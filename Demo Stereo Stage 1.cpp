@@ -112,9 +112,9 @@ int main(int argc, char* argv[]) {
     int       rgbChannels   = imgL.channels();
     int       siftChannels  = siftL.channels();
     int       gradChannels  = gradL.channels();
-    const float rgbW        = 1.60f;
-    const float siftW       = 0.20f;
-    const float gradW       = 0.30f;
+    const float rgbW        = 6.00f;
+    const float siftW       = 8.50f;
+    const float gradW       = 4.00f;
 
     CGraphPairwiseKit graphKit(nStates, INFER::Viterbi);
 

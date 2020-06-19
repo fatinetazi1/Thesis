@@ -115,19 +115,21 @@ int main(int argc, char* argv[]) {
     int       rgbChannels   = imgL.channels();
     int       siftChannels  = siftL.channels();
     int       gradChannels  = gradL.channels();
-    const float rgbW        = 0.50f;
-    const float siftW       = 0.50f;
-    const float gradW       = 0.50f;
+    const float rgbW        = 6.00f;
+    const float siftW       = 8.50f;
+    const float gradW       = 4.00f;
     float     edgeParam     = 1.175f;
     
     // Preparing parameters for parameter estimation
-    vec_float_t   vParams = {edgeParam, rgbW, siftW, gradW};
-    vec_float_t   vDeltas = {0.1f,  0.1f, 0.1f, 0.1f};
+    vec_float_t   vParams       = {edgeParam, rgbW, siftW, gradW};
+    vec_float_t   vDeltas       = {0.5f,  1.00f, 1.00f, 1.00f};
+    vec_float_t   vMaxParams    = {3.0f,  10.0f, 10.0f, 10.0f};
     
     // Initializing Powell search class and parameters
     CPowell powell(vParams.size());
     powell.setInitParams(vParams);
     powell.setDeltas(vDeltas);
+    powell.setMaxParams(vMaxParams);
     
     CGraphPairwiseKit graphKit(nStates, INFER::Viterbi);
     vec_byte_t optimalDecoding;
