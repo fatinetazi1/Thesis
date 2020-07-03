@@ -5,7 +5,7 @@
 using namespace DirectGraphicalModels;
 
 void print_help(char* argv0) {
-    printf("Usage: %s right_image left_image min_disparity max_disparity right_image_groundtruth output_disparity\n", argv0);
+    printf("Usage: %s right_image left_image min_disparity max_disparity right_image_groundtruth output_disparity output_badpixel\n", argv0);
 }
 
 float meanAbs(Mat solution, Mat gt) {
@@ -23,7 +23,7 @@ float meanAbs(Mat solution, Mat gt) {
     return sum / (solution.rows * solution.cols);
 }
 
-float badPixel(const Mat& solution, const Mat& gt) {
+float badPixel(const Mat& solution, const Mat& gt, String location) {
     Mat clone = solution.clone();
     cv::cvtColor(clone, clone, cv::COLOR_GRAY2BGR);
 
@@ -53,6 +53,7 @@ float badPixel(const Mat& solution, const Mat& gt) {
     waitKey();
     imshow("Error", clone);
     waitKey();
+    imwrite(location, clone);
 
     return 100 * sum / pixels;
 }
@@ -68,7 +69,7 @@ void compare_images(const Mat& img1, const Mat& img2)
 
 int main(int argc, char* argv[]) {
 
-    if (argc != 7) {
+    if (argc != 8) {
         print_help(argv[0]);
         return 0;
     }
@@ -106,10 +107,10 @@ int main(int argc, char* argv[]) {
         byte * pImgL    = imgL.ptr<byte>(y);
         byte * pImgR    = imgR.ptr<byte>(y);
         for (int x = 0; x < width; x++) {
-            float imgL_value = static_cast<float>(pImgL[x]);
+            float imgR_value = static_cast<float>(pImgR[x]);
             for (unsigned int s = 0; s < nStates; s++) {                    // state
                 int disparity = minDisparity + s;
-                float imgR_value = (x + disparity < width) ? static_cast<float>(pImgR[x + disparity]) : imgL_value;
+                float imgL_value = (x - disparity >= 0) ? static_cast<float>(pImgL[x - disparity]) : imgR_value;
                 float p = 1.0f - fabs(imgL_value - imgR_value) / 255.0f;
                 nodePot.at<float>(s, 0) = p * p;
             }
@@ -130,7 +131,7 @@ int main(int argc, char* argv[]) {
     imgR_gt.convertTo(gt, CV_8UC1, 1.0 / gtScaleFactor);
 
     float meanError = meanAbs(disparity, gt);
-    float badError = badPixel(disparity, gt);
+    float badError = badPixel(disparity, gt, argv[7]);
 
     // ============================ Visualization =============================
     disparity = disparity * (256 / maxDisparity);

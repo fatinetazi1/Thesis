@@ -6,7 +6,7 @@
 using namespace DirectGraphicalModels;
 
 void print_help(char* argv0) {
-    printf("Usage: %s right_image left_image min_disparity max_disparity right_image_groundtruth output_disparity\n", argv0);
+    printf("Usage: %s right_image left_image min_disparity max_disparity right_image_groundtruth output_disparity output_badpixel\n", argv0);
 }
 
 float meanAbs(Mat solution, Mat gt) {
@@ -24,7 +24,7 @@ float meanAbs(Mat solution, Mat gt) {
     return sum / (solution.rows * solution.cols);
 }
 
-float badPixel(const Mat& solution, const Mat& gt) {
+float badPixel(const Mat& solution, const Mat& gt, String location) {
     Mat clone = solution.clone();
     cv::cvtColor(clone, clone, cv::COLOR_GRAY2BGR);
 
@@ -54,6 +54,7 @@ float badPixel(const Mat& solution, const Mat& gt) {
     waitKey();
     imshow("Error", clone);
     waitKey();
+    imwrite(location, clone);
 
     return 100 * sum / pixels;
 }
@@ -71,7 +72,7 @@ int main(int argc, char* argv[]) {
     
     const int useColor = 1;
 
-    if (argc != 7) {
+    if (argc != 8) {
         print_help(argv[0]);
         return 0;
     }
@@ -190,7 +191,7 @@ int main(int argc, char* argv[]) {
 
     medianBlur(disparity, disparity, 3);
     float meanError = meanAbs(disparity, gt);
-    float badError = badPixel(disparity, gt);
+    float badError = badPixel(disparity, gt, argv[7]);
 
     // ============================ Visualization =============================
     disparity = disparity * (256 / maxDisparity);
